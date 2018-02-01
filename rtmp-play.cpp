@@ -16,9 +16,9 @@ int main(int argc, char** argv)
 	int frame_count = 0;
 	int is_firstI = 0;
 	long interval = 0, count_interval = 0;
-	struct timeval last, now;
-	gettimeofday( &last, NULL );
-	now = last;
+	int64_t last_time, now_time;
+	
+	now_time = last_time = srs_utils_time_ms();
     printf("suck rtmp stream like rtmpdump\n");
     printf("srs(simple-rtmp-server) client librtmp library.\n");
     printf("version: %d.%d.%d\n", srs_version_major(), srs_version_minor(), srs_version_revision());
@@ -31,7 +31,7 @@ int main(int argc, char** argv)
             "   %s rtmp://127.0.0.1:1935/live/livestream 1000\n"
             "   %s rtmp://ossrs.net:1935/live/livestream 1000\n",
             argv[0], argv[0], argv[0]);
-       // exit(-1);
+       	return -1;
     }
 
     // startup socket for windows.
@@ -74,23 +74,20 @@ int main(int argc, char** argv)
         }
 	    char frame_type = srs_utils_flv_video_frame_type(data, size);
 	    char avc_packet_type = srs_utils_flv_video_avc_packet_type(data, size);
-	    gettimeofday( &now, NULL );
-
-	    interval =(now.tv_sec - last.tv_sec)*1000 + (now.tv_usec- last.tv_usec)/1000;
+		now_time = srs_utils_time_ms();
+	    interval = now_time - last_time ;
+		last_time = now_time;
 	    if((avc_packet_type == 1) && (frame_type == 1 || frame_type == 2)){
 	        if(is_firstI == 0 && frame_type == 1){
-	   			srs_human_trace("---------play stream start from the first I frame at %ld ms.",(now.tv_sec*1000 + now.tv_usec/1000));
+	   			srs_human_trace("---------play stream start from the first I frame at %ld ms.",now_time);
 				is_firstI = 1;
 	   	    }
 		    frame_count++;
-		    if(interval >= count_interval){
-		   		srs_human_trace("---------------------------------------play stream past %ld ms, frame count is %d, fps is %d .",interval,frame_count,frame_count*1000/interval);
-		   		frame_count = 0;
-	   			last = now;
-	  		 }
 	    }
-        srs_human_trace("got packet: type=%s, dts=%d, pts=%d, size=%d, frame type=%d, stream_id=%d",
-            srs_human_flv_tag_type2string(type), timestamp, pts, size, frame_type, stream_id);
+		if(interval >= count_interval){
+		   	srs_human_trace("---------------------------------------play stream past %ld ms, frame count is %d, fps is %d .",interval,frame_count,frame_count*1000/interval);
+		   	frame_count = 0;	
+	  	}
 
         delete data;
     }
