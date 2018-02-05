@@ -76,7 +76,6 @@ int main(int argc, char** argv)
 	    char avc_packet_type = srs_utils_flv_video_avc_packet_type(data, size);
 		now_time = srs_utils_time_ms();
 	    interval = now_time - last_time ;
-		last_time = now_time;
 	    if((avc_packet_type == 1) && (frame_type == 1 || frame_type == 2)){
 	        if(is_firstI == 0 && frame_type == 1){
 	   			srs_human_trace("---------play stream start from the first I frame at %ld ms.",now_time);
@@ -86,7 +85,8 @@ int main(int argc, char** argv)
 	    }
 		if(interval >= count_interval){
 		   	srs_human_trace("---------------------------------------play stream past %ld ms, frame count is %d, fps is %d .",interval,frame_count,frame_count*1000/interval);
-		   	frame_count = 0;	
+		   	frame_count = 0;
+            last_time = now_time;	
 	  	}
 
         delete data;
