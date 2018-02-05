@@ -29172,8 +29172,8 @@ void srs_amf0_do_print(SrsAmf0Any* any, stringstream& ss, int level)
     } else if (any->is_string()) {
         ss << "String " << any->to_str() << endl;
     } else if (any->is_date()) {
-        ss << "Date " << std::hex << any->to_date()
-            << "/" << std::hex << any->to_date_time_zone() << endl;
+        ss << "Date " << any->to_date()
+            << "/" << any->to_date_time_zone() << endl;
     } else if (any->is_null()) {
         ss << "Null" << endl;
     } else if (any->is_ecma_array()) {
@@ -49147,8 +49147,13 @@ void srs_print_sei_profiling(char *data, int size, stringstream &ss)
 {
     SrsH264VideoPacket packet;
     srs_utils_parse_sei_profiling(data, size, &packet);
+    int count = packet.sei_nalu->data->count();
+    stringstream tmp;
+    tmp << count+1 << "-" << "play";  // key= "#count-#nodename"
+    packet.sei_nalu->data->set(tmp.str(), SrsAmf0Any::date(srs_utils_time_ms()));
     srs_amf0_do_print(packet.sei_nalu->data, ss, 1);
 }
+
 
 srs_bool srs_utils_flv_tag_is_ok(char type)
 {
