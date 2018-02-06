@@ -319,7 +319,7 @@ extern int inject_profiling_packet(srs_rtmp_t ortmp, int64_t now, int64_t timest
 
 extern int inject_profiling_packet_sei(srs_rtmp_t ortmp, int64_t now, int64_t timestamp);
 extern bool srs_utils_is_sei_profiling(char type, char * data, int size);
-extern void srs_print_sei_profiling(char *data, int size, std::stringstream &ss);
+extern void srs_print_sei_profiling(char *data, int size, std::stringstream &ss, int64_t &e2e, int64_t &e2edge, int64_t &e2relay);
 /**
  * Free the packet allocated by srs_rtmp_read_packet.
  */
