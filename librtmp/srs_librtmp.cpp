@@ -49143,15 +49143,23 @@ int srs_utils_parse_sei_profiling(char *data, int size, SrsJDProfilingSeiPacket 
     return 0;
 }
 
-void srs_print_sei_profiling(char *data, int size, stringstream &ss)
+void srs_print_sei_profiling(char *data, int size, stringstream &ss, int64_t &e2e, int64_t &e2edge, int64_t &e2relay)
 {
     SrsJDProfilingSeiPacket packet;
     srs_utils_parse_sei_profiling(data, size, &packet);
     int count = packet.sei_nalu->data->count();
     stringstream tmp;
     tmp << count+1 << "-" << "play";  // key= "#count-#nodename"
-    packet.sei_nalu->data->set(tmp.str(), SrsAmf0Any::date(srs_utils_time_ms()));
+    int64_t cur = srs_utils_time_ms();
+    packet.sei_nalu->data->set(tmp.str(), SrsAmf0Any::date(cur));
     srs_amf0_do_print(packet.sei_nalu->data, ss, 1);
+    int64_t t[3] = {0};
+    for (int i = 0; i <= count-1; i++) {
+        t[i] = cur - packet.sei_nalu->data->value_at(i)->to_date();
+    }
+    e2e += t[0];
+    e2relay += t[1];
+    e2edge += t[2];
 }
 
 

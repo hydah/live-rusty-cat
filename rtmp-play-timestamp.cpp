@@ -28,6 +28,7 @@ int main(int argc, char** argv)
     }
 
     // startup socket for windows.
+    int64_t e2e, e2relay, e2edge, sei_count = 0;
 
     srs_human_trace("rtmp url: %s", argv[1]);
     srs_rtmp_t rtmp = srs_rtmp_create(argv[1]);
@@ -66,7 +67,8 @@ int main(int argc, char** argv)
         }
 
         if (srs_utils_is_sei_profiling(type, data, size)) {
-            srs_print_sei_profiling(data, size, ss);
+            sei_count++;
+            srs_print_sei_profiling(data, size, ss, e2e, e2edge, e2relay);
             srs_human_trace("node timestamp \n %s", ss.str().c_str());
         }
 
