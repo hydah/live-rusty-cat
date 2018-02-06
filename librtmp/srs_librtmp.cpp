@@ -10085,15 +10085,15 @@ public:
     virtual int get_size();
 };
 
-class SrsH264VideoPacket : public SrsPacket {
+class SrsJDProfilingSeiPacket : public SrsPacket {
 public:
     int8_t frame_type;
     int8_t packet_type;
     int32_t cts;
     int32_t nalu_length;
     SrsH264SeiProfiling *sei_nalu;
-    SrsH264VideoPacket();
-    ~SrsH264VideoPacket();
+    SrsJDProfilingSeiPacket();
+    ~SrsJDProfilingSeiPacket();
     virtual int encode_packet(SrsBuffer *stream);
     virtual int decode(SrsBuffer *stream);
     virtual int get_size();
@@ -36328,7 +36328,7 @@ int SrsH264SeiProfiling::decode(SrsBuffer *stream)
     return ret;
 }
 
-SrsH264VideoPacket::SrsH264VideoPacket()
+SrsJDProfilingSeiPacket::SrsJDProfilingSeiPacket()
 {
     sei_nalu = new SrsH264SeiProfiling();
     // todo: assign left fields
@@ -36338,17 +36338,17 @@ SrsH264VideoPacket::SrsH264VideoPacket()
     nalu_length = 0;
 }
 
-SrsH264VideoPacket::~SrsH264VideoPacket()
+SrsJDProfilingSeiPacket::~SrsJDProfilingSeiPacket()
 {
     delete sei_nalu;
 }
 
-int SrsH264VideoPacket::get_size()
+int SrsJDProfilingSeiPacket::get_size()
 {
     return 9 + sei_nalu->get_size();
 }
 
-int SrsH264VideoPacket::encode_packet(SrsBuffer* stream)
+int SrsJDProfilingSeiPacket::encode_packet(SrsBuffer* stream)
 {
     int ret;
 
@@ -36383,34 +36383,34 @@ int SrsH264VideoPacket::encode_packet(SrsBuffer* stream)
     return sei_nalu->encode(stream);
 }
 
-int SrsH264VideoPacket::decode(SrsBuffer *stream)
+int SrsJDProfilingSeiPacket::decode(SrsBuffer *stream)
 {
     int ret;
 
     if (!stream->require(1)) {
         ret = ERROR_RTMP_MESSAGE_DECODE;
-        srs_error("decode SrsH264VideoPacket failed. ret=%d", ret);
+        srs_error("decode SrsJDProfilingSeiPacket failed. ret=%d", ret);
         return ret;
     }
     frame_type = stream->read_1bytes();
 
     if (!stream->require(1)) {
         ret = ERROR_RTMP_MESSAGE_DECODE;
-        srs_error("decode SrsH264VideoPacket failed. ret=%d", ret);
+        srs_error("decode SrsJDProfilingSeiPacket failed. ret=%d", ret);
         return ret;
     }
     packet_type = stream->read_1bytes();
 
     if (!stream->require(3)) {
         ret = ERROR_RTMP_MESSAGE_DECODE;
-        srs_error("decode SrsH264VideoPacket failed. ret=%d", ret);
+        srs_error("decode SrsJDProfilingSeiPacket failed. ret=%d", ret);
         return ret;
     }
     cts = stream->read_3bytes();
 
     if (!stream->require(4)) {
         ret = ERROR_RTMP_MESSAGE_DECODE;
-        srs_error("decode SrsH264VideoPacket failed. ret=%d", ret);
+        srs_error("decode SrsJDProfilingSeiPacket failed. ret=%d", ret);
         return ret;
     }
     nalu_length = stream->read_4bytes();
@@ -47975,7 +47975,7 @@ int inject_profiling_packet_sei(srs_rtmp_t ortmp, int64_t now, int64_t timestamp
 {
     // inject special packet
     int ret = 0;
-    SrsH264VideoPacket *sei_packet = new SrsH264VideoPacket();
+    SrsJDProfilingSeiPacket *sei_packet = new SrsJDProfilingSeiPacket();
     int count = sei_packet->sei_nalu->data->count();
     stringstream ss;
     ss << count+1 << "-" << "publish";  // key= "#count-#nodename"
@@ -49124,7 +49124,7 @@ bool srs_utils_is_sei_profiling(char type, char * data, int size)
     return SrsFlvVideo::sei_profiling(data, size);
 }
 
-int srs_utils_parse_sei_profiling(char *data, int size, SrsH264VideoPacket *packet)
+int srs_utils_parse_sei_profiling(char *data, int size, SrsJDProfilingSeiPacket *packet)
 {
     int ret = -1;
     if (!packet) {
@@ -49145,7 +49145,7 @@ int srs_utils_parse_sei_profiling(char *data, int size, SrsH264VideoPacket *pack
 
 void srs_print_sei_profiling(char *data, int size, stringstream &ss)
 {
-    SrsH264VideoPacket packet;
+    SrsJDProfilingSeiPacket packet;
     srs_utils_parse_sei_profiling(data, size, &packet);
     int count = packet.sei_nalu->data->count();
     stringstream tmp;
