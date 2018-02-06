@@ -8,22 +8,22 @@
 #include <stdlib.h>
 #include <sys/time.h>
 
-#include "srs_librtmp.h"
+#include "librtmp/srs_librtmp.h"
 
 int main(int argc, char** argv)
 {
 
-	int frame_count = 0;
-	int is_firstI = 0;
-	long interval = 0, count_interval = 0;
+	int frame_count = 0, total_count = 0;
+	int is_firstI = 0, nonfluency_count = 0;
+	long interval = 0, count_interval = 1000, total_time = 10000, start_time = 0, first_frame_time = 0;
 	int64_t last_time, now_time;
 	
-	now_time = last_time = srs_utils_time_ms();
+	now_time = last_time = start_time = srs_utils_time_ms();
     printf("suck rtmp stream like rtmpdump\n");
     printf("srs(simple-rtmp-server) client librtmp library.\n");
     printf("version: %d.%d.%d\n", srs_version_major(), srs_version_minor(), srs_version_revision());
 
-    if (argc <= 2) {
+    if (argc <= 1) {
         printf("Usage: %s <rtmp_url> <time_interval>\n"
             "   rtmp_url     RTMP stream url to play\n"
             "   time_interval   count frames per time_interval millisecond\n"
@@ -38,9 +38,14 @@ int main(int argc, char** argv)
 
     srs_human_trace("rtmp url: %s", argv[1]);
     srs_rtmp_t rtmp = srs_rtmp_create(argv[1]);
-	count_interval = atoi(argv[2]);
+    if(argc > 2){
+        count_interval = atoi(argv[2]);
+    }
 	srs_human_trace("time_interval: %d", count_interval);
-
+    if(argc > 3){
+        total_time = atoi(argv[3]);
+    }
+    srs_human_trace("total_time: %d", total_time);
     if (srs_rtmp_handshake(rtmp) != 0) {
         srs_human_trace("simple handshake failed.");
         goto rtmp_destroy;
@@ -58,7 +63,6 @@ int main(int argc, char** argv)
         goto rtmp_destroy;
     }
     srs_human_trace("play stream success");
-
     for (;;) {
         int size;
         char type;
@@ -78,23 +82,38 @@ int main(int argc, char** argv)
 	    interval = now_time - last_time ;
 	    if((avc_packet_type == 1) && (frame_type == 1 || frame_type == 2)){
 	        if(is_firstI == 0 && frame_type == 1){
-	   			srs_human_trace("---------play stream start from the first I frame at %ld ms.",now_time);
+                first_frame_time = now_time;
+	   			srs_human_trace("play stream start and the first I frame arrive at %ld ms.",first_frame_time);
 				is_firstI = 1;
 	   	    }
 		    frame_count++;
 	    }
 		if(interval >= count_interval){
-		   	srs_human_trace("---------------------------------------play stream past %ld ms, frame count is %d, fps is %d .",interval,frame_count,frame_count*1000/interval);
+            float fps = frame_count*1000/interval;
+            if(fps < 15){
+                nonfluency_count++;
+            }
+		   	srs_human_trace("play stream past %ld ms, frame count is %d, fps is %.2f.",interval,frame_count,fps);
 		   	frame_count = 0;
+            total_count++;
             last_time = now_time;	
 	  	}
-
         delete data;
+        if((now_time - start_time) >= total_time){
+            goto rtmp_destroy;
+        }
     }
 
 rtmp_destroy:
+    float nonfluency_rate = 0;
+    if(total_count != 0){
+         nonfluency_rate = nonfluency_count/total_count;
+    }
+     if(first_frame_time == 0){
+        nonfluency_rate = 100;
+    }
+    srs_human_trace("play stream end. the first frame arrive at %ld ms, nonfluency rate is %.2f .",first_frame_time,nonfluency_rate);
     srs_rtmp_destroy(rtmp);
-
     return 0;
 }
 
