@@ -124,8 +124,13 @@ rtmp_destroy:
     }
     srs_human_trace("play stream end");
     printf("--------------\n");
-    printf("first arival of I frame spent %ld ms, nonfluency rate %.2f, e2e %d, e2relay %d, e2edge %d\n",
-            first_frame_time-start_time, nonfluency_rate, e2e/sei_count, e2relay/sei_count, e2edge/sei_count);
+    if (sei_count > 0) {
+        printf("first arrival of I frame spent %ld ms, nonfluency rate %.2f, e2e %d ms, e2relay %d ms, e2edge %dms\n",
+                first_frame_time-start_time, nonfluency_rate, e2e/sei_count, e2relay/sei_count, e2edge/sei_count);
+    } else {
+        printf("first arrival of I frame spent %ld ms, nonfluency rate %.2f\n",
+                first_frame_time-start_time, nonfluency_rate);
+    }
     srs_rtmp_destroy(rtmp);
     return 0;
 }
