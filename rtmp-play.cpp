@@ -22,6 +22,7 @@ int main(int argc, char** argv)
 	long interval = 0, count_interval = 1000, total_time = 10000, start_time = 0, first_frame_time = 0;
 	int64_t last_time, now_time;
     int64_t e2e = 0, e2relay = 0, e2edge = 0, sei_count = 0;
+    float nonfluency_rate = 0;
 
 	now_time = last_time = start_time = srs_utils_time_ms();
     printf("suck rtmp stream like rtmpdump\n");
@@ -71,13 +72,31 @@ int main(int argc, char** argv)
     for (;;) {
         int size;
         char type;
-        char* data;
+        char* data = NULL;
         uint32_t timestamp, pts;
         uint32_t stream_id;
         std::stringstream ss;
 
+		now_time = srs_utils_time_ms();
+        if((now_time - start_time) >= total_time){
+            break;
+        }
+
+	    interval = now_time - last_time ;
+		if(interval >= count_interval && is_firstI == 1){
+            float fps = float(frame_count*1000)/interval;
+            if(fps < 15.0){
+                nonfluency_count++;
+            }
+		   	srs_human_trace("play stream past %ld ms, frame count is %d, fps is %.2f.",interval,frame_count,fps);
+		   	frame_count = 0;
+            total_count++;
+            last_time = now_time;
+	  	}
+
+        // if this func is non-block, it will be better.
         if (srs_rtmp_read_packet(rtmp, &type, &timestamp, &data, &size, &stream_id) != 0) {
-            goto rtmp_destroy;
+            break;
         }
 
         if (srs_utils_is_sei_profiling(type, data, size)) {
@@ -86,44 +105,30 @@ int main(int argc, char** argv)
             srs_human_trace("node timestamp \n %s", ss.str().c_str());
         }
 
-	    char frame_type = srs_utils_flv_video_frame_type(data, size);
+        char frame_type = srs_utils_flv_video_frame_type(data, size);
 	    char avc_packet_type = srs_utils_flv_video_avc_packet_type(data, size);
-		now_time = srs_utils_time_ms();
-	    interval = now_time - last_time ;
 	    if((avc_packet_type == SrsVideoAvcFrameTraitNALU) && (frame_type == SrsVideoAvcFrameTypeKeyFrame || frame_type == SrsVideoAvcFrameTypeInterFrame)){
+		    frame_count++;
 	        if(is_firstI == 0 && frame_type == SrsVideoAvcFrameTypeKeyFrame){
                 first_frame_time = now_time;
 	   			srs_human_trace("play stream start and the first I frame arrive at %ld ms.",first_frame_time);
 				is_firstI = 1;
+                last_time = now_time;
 	   	    }
-		    frame_count++;
-	    }
-		if(interval >= count_interval){
-            float fps = frame_count*1000/interval;
-            if(fps < 15){
-                nonfluency_count++;
-            }
-		   	srs_human_trace("play stream past %ld ms, frame count is %d, fps is %.2f.",interval,frame_count,fps);
-		   	frame_count = 0;
-            total_count++;
-            last_time = now_time;
-	  	}
-        delete data;
-        if((now_time - start_time) >= total_time){
-            goto rtmp_destroy;
         }
+
+        delete data;
     }
 
-rtmp_destroy:
-    float nonfluency_rate = 0;
     if(total_count != 0){
-         nonfluency_rate = nonfluency_count/total_count;
+         nonfluency_rate = float(nonfluency_count)/total_count;
     }
      if(first_frame_time == 0){
         nonfluency_rate = 100;
     }
     srs_human_trace("play stream end");
     printf("--------------\n");
+    printf("total count %d, non count %d\n", total_count, nonfluency_count);
     if (sei_count > 0) {
         printf("first arrival of I frame spent %ld ms, nonfluency rate %.2f, e2e %d ms, e2relay %d ms, e2edge %dms\n",
                 first_frame_time-start_time, nonfluency_rate, e2e/sei_count, e2relay/sei_count, e2edge/sei_count);
@@ -131,6 +136,8 @@ rtmp_destroy:
         printf("first arrival of I frame spent %ld ms, nonfluency rate %.2f\n",
                 first_frame_time-start_time, nonfluency_rate);
     }
+
+rtmp_destroy:
     srs_rtmp_destroy(rtmp);
     return 0;
 }
