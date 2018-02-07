@@ -218,6 +218,9 @@ int proxy(srs_flv_t flv, srs_rtmp_t ortmp, bool recur)
     }
 
     do {
+        starttime = -1;
+        timestamp = 0;
+        tools_main_entrance_startup_time = srs_utils_time_ms();
         if ((ret = srs_flv_read_header(flv, header)) != 0) {
             return ret;
         }

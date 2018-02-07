@@ -15857,6 +15857,8 @@ public:
     virtual bool is_never_timeout(int64_t tm);
     virtual int read_fully(void* buf, size_t size, ssize_t* nread);
     virtual int write(void* buf, size_t size, ssize_t* nwrite);
+public:
+    virtual void set_tcp_nodelay();
 };
 
 #endif
@@ -47481,7 +47483,8 @@ int srs_rtmp_connect_server(srs_rtmp_t rtmp)
         context->rtimeout = SRS_SOCKET_DEFAULT_TMMS;
         context->skt->set_recv_timeout(context->rtimeout);
     }
-
+    // set TCP_NODELAY
+    context->skt->set_tcp_nodelay();
     if ((ret = srs_librtmp_context_connect(context)) != ERROR_SUCCESS) {
         return ret;
     }
@@ -49848,6 +49851,7 @@ CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
     #include <netinet/in.h>
     #include <arpa/inet.h>
     #include <sys/uio.h>
+    #include <netinet/tcp.h>
 #endif
 
 #include <sys/types.h>
@@ -49969,6 +49973,20 @@ CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 
         return ERROR_SUCCESS;
     }
+
+    int srs_hijack_io_set_tcp_nodelay(srs_hijack_io_t ctx)
+    {
+        SrsBlockSyncSocket* skt = (SrsBlockSyncSocket*)ctx;
+        socklen_t nb_v = sizeof(int);
+        int v = 1;
+        // set the socket send buffer when required larger buffer
+        if (setsockopt(skt->fd, IPPROTO_TCP, TCP_NODELAY, &v, nb_v) < 0) {
+            srs_warn("set sock TCP_NODELAY=%d failed.", v);
+            return SOCKET_ERRNO();
+        }
+        return ERROR_SUCCESS;
+    }
+
     int64_t srs_hijack_io_get_recv_timeout(srs_hijack_io_t ctx)
     {
         SrsBlockSyncSocket* skt = (SrsBlockSyncSocket*)ctx;
@@ -50141,6 +50159,11 @@ void SimpleSocketStream::set_recv_timeout(int64_t tm)
 {
     srs_assert(io);
     srs_hijack_io_set_recv_timeout(io, tm);
+}
+void SimpleSocketStream::set_tcp_nodelay()
+{
+    srs_assert(io);
+    srs_hijack_io_set_tcp_nodelay(io);
 }
 
 int64_t SimpleSocketStream::get_recv_timeout()

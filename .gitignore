@@ -1,4 +1,7 @@
 *.o
-bin/
 output/
 .vscode
+bin/*
+logs/*
+*.flv
+
