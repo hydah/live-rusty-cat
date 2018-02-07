@@ -68,6 +68,7 @@ void sig_handler( int sig )
 int main(int argc, char** argv)
 {
     signal( SIGINT, sig_handler );
+    signal( SIGTERM, sig_handler );
 	int frame_count = 0, total_count = 0;
 	int is_firstI = 0, nonfluency_count = 0, print_log = 0;
 	long interval = 0, count_interval = 0, total_time = 0, start_time = 0, first_frame_time = 0;
