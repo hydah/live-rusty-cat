@@ -15857,6 +15857,8 @@ public:
     virtual bool is_never_timeout(int64_t tm);
     virtual int read_fully(void* buf, size_t size, ssize_t* nread);
     virtual int write(void* buf, size_t size, ssize_t* nwrite);
+public:
+    virtual void set_tcp_nodelay();
 };
 
 #endif
@@ -47481,7 +47483,8 @@ int srs_rtmp_connect_server(srs_rtmp_t rtmp)
         context->rtimeout = SRS_SOCKET_DEFAULT_TMMS;
         context->skt->set_recv_timeout(context->rtimeout);
     }
-
+    // set TCP_NODELAY
+    context->skt->set_tcp_nodelay();
     if ((ret = srs_librtmp_context_connect(context)) != ERROR_SUCCESS) {
         return ret;
     }
@@ -49116,6 +49119,27 @@ int srs_utils_parse_timestamp(
     return ret;
 }
 
+bool srs_utils_is_metadata(char type, char *data, int size)
+{
+   if (type != SRS_RTMP_TYPE_SCRIPT) {
+       return false;
+   }
+    SrsBuffer stream;
+    stream.initialize(data, size);
+    std::string name;
+
+    int ret = ERROR_SUCCESS;
+
+    if ((ret = srs_amf0_read_string(&stream, name)) != ERROR_SUCCESS) {
+        srs_error("decode metadata name failed. ret=%d", ret);
+        return false;
+    }
+    if (name != SRS_CONSTS_RTMP_ON_METADATA) {
+        return false;
+    }
+    return true;
+}
+
 bool srs_utils_is_sei_profiling(char type, char * data, int size)
 {
     if (type != SRS_RTMP_TYPE_VIDEO) {
@@ -49143,6 +49167,14 @@ int srs_utils_parse_sei_profiling(char *data, int size, SrsJDProfilingSeiPacket 
     return 0;
 }
 
+void srs_print_metadata(char *data, int size, stringstream &ss)
+{
+    SrsOnMetaDataPacket packet;
+    SrsBuffer stream;
+    stream.initialize(data, size);
+    packet.decode(&stream);
+    srs_amf0_do_print(packet.metadata, ss, 1);
+}
 void srs_print_sei_profiling(char *data, int size, stringstream &ss, int64_t &e2e, int64_t &e2edge, int64_t &e2relay)
 {
     SrsJDProfilingSeiPacket packet;
@@ -49848,6 +49880,7 @@ CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
     #include <netinet/in.h>
     #include <arpa/inet.h>
     #include <sys/uio.h>
+    #include <netinet/tcp.h>
 #endif
 
 #include <sys/types.h>
@@ -49969,6 +50002,20 @@ CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 
         return ERROR_SUCCESS;
     }
+
+    int srs_hijack_io_set_tcp_nodelay(srs_hijack_io_t ctx)
+    {
+        SrsBlockSyncSocket* skt = (SrsBlockSyncSocket*)ctx;
+        socklen_t nb_v = sizeof(int);
+        int v = 1;
+        // set the socket send buffer when required larger buffer
+        if (setsockopt(skt->fd, IPPROTO_TCP, TCP_NODELAY, &v, nb_v) < 0) {
+            srs_warn("set sock TCP_NODELAY=%d failed.", v);
+            return SOCKET_ERRNO();
+        }
+        return ERROR_SUCCESS;
+    }
+
     int64_t srs_hijack_io_get_recv_timeout(srs_hijack_io_t ctx)
     {
         SrsBlockSyncSocket* skt = (SrsBlockSyncSocket*)ctx;
@@ -50141,6 +50188,11 @@ void SimpleSocketStream::set_recv_timeout(int64_t tm)
 {
     srs_assert(io);
     srs_hijack_io_set_recv_timeout(io, tm);
+}
+void SimpleSocketStream::set_tcp_nodelay()
+{
+    srs_assert(io);
+    srs_hijack_io_set_tcp_nodelay(io);
 }
 
 int64_t SimpleSocketStream::get_recv_timeout()
