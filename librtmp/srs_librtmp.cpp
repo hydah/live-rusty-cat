@@ -49119,6 +49119,27 @@ int srs_utils_parse_timestamp(
     return ret;
 }
 
+bool srs_utils_is_metadata(char type, char *data, int size)
+{
+   if (type != SRS_RTMP_TYPE_SCRIPT) {
+       return false;
+   }
+    SrsBuffer stream;
+    stream.initialize(data, size);
+    std::string name;
+
+    int ret = ERROR_SUCCESS;
+
+    if ((ret = srs_amf0_read_string(&stream, name)) != ERROR_SUCCESS) {
+        srs_error("decode metadata name failed. ret=%d", ret);
+        return false;
+    }
+    if (name != SRS_CONSTS_RTMP_ON_METADATA) {
+        return false;
+    }
+    return true;
+}
+
 bool srs_utils_is_sei_profiling(char type, char * data, int size)
 {
     if (type != SRS_RTMP_TYPE_VIDEO) {
@@ -49146,6 +49167,14 @@ int srs_utils_parse_sei_profiling(char *data, int size, SrsJDProfilingSeiPacket 
     return 0;
 }
 
+void srs_print_metadata(char *data, int size, stringstream &ss)
+{
+    SrsOnMetaDataPacket packet;
+    SrsBuffer stream;
+    stream.initialize(data, size);
+    packet.decode(&stream);
+    srs_amf0_do_print(packet.metadata, ss, 1);
+}
 void srs_print_sei_profiling(char *data, int size, stringstream &ss, int64_t &e2e, int64_t &e2edge, int64_t &e2relay)
 {
     SrsJDProfilingSeiPacket packet;
