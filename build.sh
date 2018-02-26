@@ -28,4 +28,4 @@ cp -rf video/ live-rusty-cat
 cp rtmp-ts.sh live-rusty-cat
 #tar czvf live-rusty-cat.tgz live-rusty-cat
 rm -rf live-rusty-cat
-tar czvf live-rusty-cat.tgz ../live-rusty-cat/bin ../live-rusty-cat/logs ../live-rusty-cat/video ../live-rusty-cat/rtmp-ts.sh
+tar czvf live-rusty-cat.tgz ../live-rusty-cat/bin ../live-rusty-cat/logs ../live-rusty-cat/video ../live-rusty-cat/scripts ../live-rusty-cat/resource
