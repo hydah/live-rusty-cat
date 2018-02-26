@@ -196,14 +196,13 @@ int main(int argc, char** argv)
     }
     srs_human_trace("play stream end");
     printf("--------------\n");
-    printf("total count %d, non count %d\n", total_count, nonfluency_count);
+    printf("total count %d, nonfluency count %d\n", total_count, nonfluency_count);
+    printf("first arrival of I frame spent %ld ms, nonfluency rate %.2f, sei frame count %d",
+           first_frame_time - start_time, nonfluency_rate, sei_count);
     if (sei_count > 0) {
-        printf("first arrival of I frame spent %ld ms, nonfluency rate %.2f, e2e %d ms, e2relay %d ms, e2edge %dms\n",
-                first_frame_time-start_time, nonfluency_rate, e2e/sei_count, e2relay/sei_count, e2edge/sei_count);
-    } else {
-        printf("first arrival of I frame spent %ld ms, nonfluency rate %.2f\n",
-                first_frame_time-start_time, nonfluency_rate);
-    }
+        printf(", e2e %d ms, e2relay %d ms, e2edge %d ms",e2e/sei_count, e2relay/sei_count, e2edge/sei_count);
+    } 
+    printf("\n");
 
 rtmp_destroy:
     srs_rtmp_destroy(rtmp);
