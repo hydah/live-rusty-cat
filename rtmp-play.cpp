@@ -31,12 +31,13 @@ void print_usage(int argc, char** argv)
 static long count_interval = 1000;
 static long total_time = 10000;
 bool print_log = false;
+bool print_sum = false;
 char *input_url = NULL;
 bool parse_metadata = false;
 
 void parse_configure(int argc, char** argv)
 {
-    const char *optString = "i:t:r:pm";
+    const char *optString = "i:t:r:pms";
     char opt;
     while ((opt = getopt(argc, argv, optString)) != -1) {
         switch(opt) {
@@ -55,6 +56,9 @@ void parse_configure(int argc, char** argv)
                 break;
             case 'm':
                 parse_metadata = true;
+                break;
+            case 's':
+                print_sum = true;
                 break;
             case '?':
                 print_usage(argc, argv);
@@ -89,39 +93,47 @@ int main(int argc, char** argv)
     int64_t e2e = 0, e2relay = 0, e2edge = 0, sei_count = 0;
     float nonfluency_rate = 0;
 	now_time = last_time = start_time = srs_utils_time_ms();
-    printf("suck rtmp stream like rtmpdump\n");
-    printf("srs(simple-rtmp-server) client librtmp library.\n");
-    printf("version: %d.%d.%d\n", srs_version_major(), srs_version_minor(), srs_version_revision());
-
     if (argc < 2) {
-        print_usage(argc,argv);
+        if (print_log){
+            print_usage(argc,argv);
+        }
        	return -1;
     }
 
     // startup socket for windows.
     parse_configure(argc, argv);
-    srs_human_trace("rtmp url: %s", input_url);
     srs_rtmp_t rtmp = srs_rtmp_create(input_url);
-	srs_human_trace("time_interval: %d", count_interval);
-    srs_human_trace("total_time: %d", total_time);
+    if (print_log){
+        srs_human_trace("suck rtmp stream like rtmpdump");
+        srs_human_trace("srs(simple-rtmp-server) client librtmp library.");
+        srs_human_trace("version: %d.%d.%d", srs_version_major(), srs_version_minor(), srs_version_revision());
+        srs_human_trace("rtmp url: %s", input_url);
+	    srs_human_trace("time_interval: %d", count_interval);
+        srs_human_trace("total_time: %d", total_time);
+    }
     if (srs_rtmp_handshake(rtmp) != 0) {
-        srs_human_trace("simple handshake failed.");
+        if (print_log){
+            srs_human_trace("simple handshake failed.");
+        }
         goto rtmp_destroy;
     }
-    srs_human_trace("simple handshake success");
-
     if (srs_rtmp_connect_app(rtmp) != 0) {
-        srs_human_trace("connect vhost/app failed.");
+        if (print_log){
+            srs_human_trace("connect vhost/app failed.");
+        }
         goto rtmp_destroy;
     }
-    srs_human_trace("connect vhost/app success");
-
     if (srs_rtmp_play_stream(rtmp) != 0) {
-        srs_human_trace("play stream failed.");
+        if (print_log){
+            srs_human_trace("play stream failed.");
+        }
         goto rtmp_destroy;
     }
-    srs_human_trace("play stream success");
-
+    if (print_log){
+        srs_human_trace("simple handshake success");
+        srs_human_trace("connect vhost/app success");
+        srs_human_trace("play stream success");
+    }
     for (;keep_running!=0;) {
         int size;
         char type;
@@ -158,7 +170,10 @@ int main(int argc, char** argv)
         if (parse_metadata && srs_utils_is_metadata(type, data, size)) {
             std::stringstream ms;
             srs_print_metadata(data, size, ms);
-            srs_human_trace("metadata is \n %s", ms.str().c_str());
+            if (print_log)
+            {
+                srs_human_trace("metadata is \n %s", ms.str().c_str());
+            }
         }
 
         if (srs_utils_is_sei_profiling(type, data, size)) {
@@ -194,13 +209,14 @@ int main(int argc, char** argv)
      if(first_frame_time == 0){
         nonfluency_rate = 100;
     }
-    srs_human_trace("play stream end");
-    printf("--------------\n");
-    printf("total count %d, nonfluency count %d\n", total_count, nonfluency_count);
-    printf("first arrival of I frame spent %ld ms, nonfluency rate %.2f, sei frame count %d",
-           first_frame_time - start_time, nonfluency_rate, sei_count);
+    if (print_log)
+    {
+        srs_human_trace("play stream end");
+    }
+    printf("address %s, firstItime %ld, total_count %ld, nonfluency_count %ld, nonfluency_rate %.2f, sei_frame_count %d",
+           input_url, first_frame_time - start_time, total_count, nonfluency_count, nonfluency_rate, sei_count);
     if (sei_count > 0) {
-        printf(", e2e %d ms, e2relay %d ms, e2edge %d ms",e2e/sei_count, e2relay/sei_count, e2edge/sei_count);
+        printf(", e2e %d, e2relay %d, e2edge %d",e2e/sei_count, e2relay/sei_count, e2edge/sei_count);
     } 
     printf("\n");
 
