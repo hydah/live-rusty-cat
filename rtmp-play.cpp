@@ -44,7 +44,7 @@ void parse_configure(int argc, char** argv)
     while ((opt = getopt(argc, argv, optString)) != -1) {
         switch(opt) {
             case 'i':
-                input_url = (char *)malloc(strlen(optarg));
+                input_url = (char *)malloc(strlen(optarg)+1);
                 strcpy(input_url, optarg);
                 break;
             case 't':
