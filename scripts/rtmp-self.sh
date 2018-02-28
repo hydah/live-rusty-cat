@@ -1,6 +1,6 @@
 #!/bin/bash
 WORK_DIR=`dirname $0`
-WORK_DIR=`cd ${WORK_DIR}; pwd`
+WORK_DIR=`cd ${WORK_DIR}/..; pwd`
 NAME=`basename $0`
 
 function rand() {
@@ -70,7 +70,7 @@ init $1
 HOSTNAME=`hostname`
 function publish() {
     for ((;;)); do
-     ./bin/rtmp-publish -i ./video/avatar.flv -y rtmp://origin.jcloud.com/profiling?vhost=push.jcloud.com/avatar-${HOSTNAME} &>/dev/null
+     ${WORK_DIR}/bin/rtmp-publish -i ./video/avatar.flv -y rtmp://origin.jcloud.com/profiling?vhost=push.jcloud.com/avatar-${HOSTNAME} &>/dev/null
     done
 }
 
@@ -82,6 +82,6 @@ sleep 5
 for ((;;)); do
     cur_log=$(run_log)
     # run 2 mins
-    ./bin/rtmp-play -t 120000 rtmp://127.0.0.1/profiling?vhost=play.jcloud.com/avatar-${HOSTNAME} >> ${cur_log} 2>&1
+    ${WORK_DIR}/bin/rtmp-play -t 120000 -i rtmp://127.0.0.1/profiling?vhost=play.jcloud.com/avatar-${HOSTNAME} >> ${cur_log} 2>&1
     sleep 10
 done
