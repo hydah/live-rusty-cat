@@ -96,8 +96,8 @@ OPs=($(get_ops))
 function do_sniff() {
     ##$1: vip name
     ##$2: vip ip
-    cur_log=$(run_vip_log $1)
     for ((;;)); do
+        cur_log=$(run_vip_log $1)
         ${WORK_DIR}/bin/rtmp-play -t 120000 -i rtmp://$2:1935/profiling?vhost=play.jcloud.com/shwj4 >> ${cur_log} 2>&1
         sleep 10
     done
