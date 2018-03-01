@@ -44,7 +44,7 @@ void parse_configure(int argc, char** argv)
     while ((opt = getopt(argc, argv, optString)) != -1) {
         switch(opt) {
             case 'i':
-                input_url = (char *)malloc(strlen(optarg));
+                input_url = (char *)malloc(strlen(optarg)+1);
                 strcpy(input_url, optarg);
                 break;
             case 't':
@@ -201,14 +201,14 @@ int main(int argc, char** argv)
         srs_human_trace("play stream end");
     }
 
+
+rtmp_destroy:
     printf("address %s, firstItime %ld, total_count %ld, nonfluency_count %ld, nonfluency_rate %.2f, sei_frame_count %d",
            input_url, first_frame_time - start_time, total_count, nonfluency_count, nonfluency_rate, sei_count);
     if (sei_count > 0) {
         printf(", e2e %d, e2relay %d, e2edge %d",e2e/sei_count, e2relay/sei_count, e2edge/sei_count);
     }
     printf("\n");
-
-rtmp_destroy:
     srs_rtmp_destroy(rtmp);
     return 0;
 }
