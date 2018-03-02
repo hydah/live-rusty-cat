@@ -102,7 +102,7 @@ function do_sniff() {
     ##$2: vip ip
     for ((;;)); do
         cur_log=$(run_vip_log $1)
-        ${WORK_DIR}/bin/rtmp-play -t 120000 -i rtmp://$2/profiling?vhost=play.jcloud.com/shwj4 >> ${cur_log} 2>&1
+        ${WORK_DIR}/bin/rtmp-play -t 120000 -i rtmp://$2/profiling?vhost=play.jcloud.com/avatar >> ${cur_log} 2>&1
         sleep 10
     done
 

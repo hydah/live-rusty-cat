@@ -31,7 +31,7 @@ function cac() {
     name=$3
     tmpfile="/tmp/live-rusty-cat-result-`date +%s`"
     fail_times=`grep 'total_count 0' $1 | wc -l`
-    grep 'address' -v 'total_count 0' $1 > $tmpfile
+    grep 'address' $1 | grep -v 'total_count 0' > $tmpfile
     suc_times=`cat $tmpfile | wc -l`
 
     avg_e2e=$(cat $tmpfile | cut -d ',' -f 7  | grep -v '^$' | cut -d ' ' -f 3 | awk '{sum+=$1} END {print sum/NR}')
@@ -49,7 +49,7 @@ function cac() {
     echo -n '; avg_e2e ' $avg_e2e >>$resfile
     echo -n '; total_cnt ' $total_cnt >>$resfile
     echo -n '; nonf_cnt ' $nonf_cnt >>$resfile
-    echo -n '; avg_nf ' $avg_nf >>$resfile
+    echo    '; avg_nf ' $avg_nf >>$resfile
 }
 
 for ((i=0; i<${#OPs[@]}; i=i+2)); do

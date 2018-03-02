@@ -1,7 +1,7 @@
 file=$1
 tmpfile="/tmp/live-rusty-cat-result-`date +%s`"
 fail_times=`grep 'total_count 0' $1 | wc -l`
-grep 'address' -v 'total_count 0' $1 > $tmpfile
+grep 'address' $1  | grep -v 'total_count 0' > $tmpfile
 suc_times=`cat $tmpfile | wc -l`
 
 avg_e2e=$(cat $tmpfile | cut -d ',' -f 7  | grep -v '^$' | cut -d ' ' -f 3 | awk '{sum+=$1} END {print sum/NR}')
@@ -19,4 +19,4 @@ echo -n '; avg_iframe ' $avg_iframe
 echo -n '; avg_e2e ' $avg_e2e
 echo -n '; total_cnt ' $total_cnt
 echo -n '; nonf_cnt ' $nonf_cnt
-echo -n '; avg_nf ' $avg_nf
+echo    '; avg_nf ' $avg_nf
