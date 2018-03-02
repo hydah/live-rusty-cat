@@ -46,8 +46,12 @@ function init() {
     if [ "x$cids" != "x" ]; then
         echo -e "killing all child pids..." >> $cur_log
         for pid in $cids; do
-            kill -9 $pid > /dev/null 2>&1
-            echo -e "[$cur_time][$cur_pid] kill old child shell: $pid" >> $cur_log
+            if [ "x$pid" == "x$cur_pid" ]; then
+                echo -e "['$cur_time][$cur_pid] not kill self" >> $cur_log
+            else
+                kill -9 $pid > /dev/null 2>&1
+                echo -e "[$cur_time][$cur_pid] kill old child shell: $pid" >> $cur_log
+            fi
         done
     fi
 
@@ -79,7 +83,6 @@ sleep 5
 
 for ((;;)); do
     cur_log=$(run_log)
-    echo $cur_log
     # run 2 mins
     ${WORK_DIR}/bin/rtmp-play -t 120000 -i rtmp://127.0.0.1/profiling?vhost=play.jcloud.com/avatar-${HOSTNAME} >> ${cur_log} 2>&1
     sleep 10

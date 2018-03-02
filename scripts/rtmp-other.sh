@@ -62,8 +62,12 @@ function init() {
     if [ "x$cids" != "x" ]; then
         echo -e "killing all child pids..." >> $cur_log
         for pid in $cids; do
-            kill -9 $pid > /dev/null 2>&1
-            echo -e "[$cur_time][$cur_pid] kill old child shell: $pid" >> $cur_log
+            if [ "x$pid" == "x$cur_pid" ]; then
+                echo -e "['$cur_time][$cur_pid] not kill self" >> $cur_log
+            else
+                kill -9 $pid > /dev/null 2>&1
+                echo -e "[$cur_time][$cur_pid] kill old child shell: $pid" >> $cur_log
+            fi
         done
     fi
 
@@ -98,7 +102,7 @@ function do_sniff() {
     ##$2: vip ip
     for ((;;)); do
         cur_log=$(run_vip_log $1)
-        ${WORK_DIR}/bin/rtmp-play -t 120000 -i rtmp://$2:1935/profiling?vhost=play.jcloud.com/shwj4 >> ${cur_log} 2>&1
+        ${WORK_DIR}/bin/rtmp-play -t 120000 -i rtmp://$2/profiling?vhost=play.jcloud.com/shwj4 >> ${cur_log} 2>&1
         sleep 10
     done
 
