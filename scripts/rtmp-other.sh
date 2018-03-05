@@ -91,6 +91,8 @@ function get_ops() {
     HOSTNAME=`hostname`
     OP=`echo $HOSTNAME | cut -d '-' -f 2`
     OPs=`cat $WORK_DIR/resource/edge_vip.txt | grep $OP`
+    #NAME=`echo $HOSTNAME | cut -d '-' -f 1`
+    #OPs=`python2 $WORK_DIR/scripts/nearest.py $WORK_DIR/resource/edge_vip.json $NAME $OP`
     echo ${OPs}
 }
 

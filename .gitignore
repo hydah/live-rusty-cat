@@ -4,4 +4,6 @@ output/
 bin/*
 logs/*
 *.flv
+cscope*
+tags
 
