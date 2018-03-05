@@ -4,11 +4,29 @@ fail_times=`grep 'total_count 0' $1 | wc -l`
 grep 'address' $1  | grep -v 'total_count 0' > $tmpfile
 suc_times=`cat $tmpfile | wc -l`
 
-avg_e2e=$(cat $tmpfile | cut -d ',' -f 7  | grep -v '^$' | cut -d ' ' -f 3 | awk '{sum+=$1} END {print sum/NR}')
-avg_iframe=$(cat $tmpfile | cut -d ',' -f 2  | grep -v '^$' |cut -d ' '  -f 3 | awk '{sum+=$1} END {print sum/NR}')
-total_cnt=$(cat $tmpfile | cut -d ',' -f 3  | grep -v '^$' |cut -d ' '  -f 3 | awk '{sum+=$1} END {print sum}')
-nonf_cnt=$(cat $tmpfile | cut -d ',' -f 4  | grep -v '^$' |cut -d ' '  -f 3 | awk '{sum+=$1} END {print sum}')
+avg_e2e=0
+avg_iframe=0
+total_cnt=0
+nonf_cnt=0
+if [ $suc_times -gt 0 ]; then
+    avg_e2e=$(cat $tmpfile | cut -d ',' -f 7  | grep -v '^$' | cut -d ' ' -f 3 | awk '{sum+=$1} END {print sum/NR}')
+    avg_iframe=$(cat $tmpfile | cut -d ',' -f 2  | grep -v '^$' |cut -d ' '  -f 3 | awk '{sum+=$1} END {print sum/NR}')
+    total_cnt=$(cat $tmpfile | cut -d ',' -f 3  | grep -v '^$' |cut -d ' '  -f 3 | awk '{sum+=$1} END {print sum}')
+    nonf_cnt=$(cat $tmpfile | cut -d ',' -f 4  | grep -v '^$' |cut -d ' '  -f 3 | awk '{sum+=$1} END {print sum}')
+fi
 avg_nf=0.0
+if [ -z "$total_cnt" ]; then
+    total_cnt=0
+fi
+if [ -z "$nonf_cnt" ]; then
+    nonf_cnt=0
+fi
+if [ -z "$avg_e2e" ]; then
+    avg_e2e=0
+fi
+if [ -z "$avg_iframe" ]; then
+    avg_iframe=0
+fi
 if [ $total_cnt -gt 0 ]; then
     avg_nf=$(echo "$total_cnt $nonf_cnt" | awk '{print $2/$1}')
 fi
