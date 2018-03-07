@@ -160,7 +160,7 @@ int do_proxy(srs_flv_t flv, srs_rtmp_t ortmp, int64_t re, int32_t* pstarttime, u
         now = srs_utils_time_ms();
         if (now - last_timestamp >= 3000) {
             last_timestamp = now;
-            if((ret = inject_profiling_packet_sei(ortmp, now, 0)) != 0) {
+            if((ret = inject_profiling_packet_sei(ortmp, now, *ptimestamp)) != 0) {
                 return ret;
             }
         }

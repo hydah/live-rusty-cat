@@ -36268,7 +36268,7 @@ int SrsH264SeiProfiling::decode(SrsBuffer *stream)
     }
     header = stream->read_1bytes();
 
-    uint32_t tmp;
+    uint8_t tmp;
     payload_type = 0;
     while(true) {
         if (!stream->require(1)) {
@@ -49163,6 +49163,7 @@ int srs_utils_parse_sei_profiling(char *data, int size, SrsJDProfilingSeiPacket 
     stream.initialize(data, size);
 
     packet->decode(&stream);
+    srs_human_trace("size is %d", packet->get_size());
 
     return 0;
 }
