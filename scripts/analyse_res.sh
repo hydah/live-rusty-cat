@@ -31,10 +31,10 @@ if [ $total_cnt -gt 0 ]; then
     avg_nf=$(echo "$total_cnt $nonf_cnt" | awk '{print $2/$1}')
 fi
 echo -n `hostname`:
-echo -n ' try_times ' $(($fail_times+$suc_times))
-echo -n '; fail_times ' $fail_times
-echo -n '; avg_iframe ' $avg_iframe
-echo -n '; avg_e2e ' $avg_e2e
-echo -n '; total_cnt ' $total_cnt
-echo -n '; nonf_cnt ' $nonf_cnt
-echo    '; avg_nf ' $avg_nf
+echo -n ' try_times '$(($fail_times+$suc_times))
+echo -n '; fail_times '$fail_times
+echo -n '; avg_iframe '$avg_iframe
+echo -n '; avg_e2e '$avg_e2e
+echo -n '; total_cnt '$total_cnt
+echo -n '; nonf_cnt '$nonf_cnt
+echo    '; avg_nf '$avg_nf

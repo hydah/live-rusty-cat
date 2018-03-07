@@ -9,7 +9,7 @@ LOG_DIR=$WORK_DIR/logs/rtmp-other
 CUR_TIME=$(date -d "today" +"%Y-%m-%d-%H")
 CUR_TIME=$1
 
-DEST_DIR=${NAME%.*}-$HOSTNAME-$CUR_TIME
+DEST_DIR=${NAME%.*}_${HOSTNAME}_${CUR_TIME}
 rm -rf /tmp/$DEST_DIR
 mkdir -p /tmp/$DEST_DIR
 
@@ -21,6 +21,8 @@ for file in `ls *.$CUR_TIME`; do
 done
 popd
 
-pushd /tmp
-tar czvf $WORK_DIR/$DEST_DIR.tgz $DEST_DIR
-popd
+if `ls $LOG_DIR/*.$CUR_TIME`; do
+    pushd /tmp
+    tar czvf $WORK_DIR/result/$DEST_DIR.tgz $DEST_DIR
+    popd
+fi

@@ -6,6 +6,7 @@ rm -rf $RES_DIR
 mkdir -p $RES_DIR
 SUM_RES_FILE=$RES_DIR/all.log
 NEAR_RES_FILE=$RES_DIR/nearest.log
+FAST_RES_FILE=$RES_DIR/fastest.log
 #$1 is the tar file
 
 HOSTNAME=`hostname`
@@ -55,13 +56,13 @@ function cac() {
         avg_nf=$(echo "$total_cnt $nonf_cnt" | awk '{print $2/$1}')
     fi
     echo -n $name: >> $resfile
-    echo -n ' try_times ' $(($fail_times+$suc_times)) >>$resfile
-    echo -n '; fail_times ' $fail_times >>$resfile
-    echo -n '; avg_iframe ' $avg_iframe >>$resfile
-    echo -n '; avg_e2e ' $avg_e2e >>$resfile
-    echo -n '; total_cnt ' $total_cnt >>$resfile
-    echo -n '; nonf_cnt ' $nonf_cnt >>$resfile
-    echo    '; avg_nf ' $avg_nf >>$resfile
+    echo -n ' try_times '$(($fail_times+$suc_times)) >>$resfile
+    echo -n '; fail_times '$fail_times >>$resfile
+    echo -n '; avg_iframe '$avg_iframe >>$resfile
+    echo -n '; avg_e2e '$avg_e2e >>$resfile
+    echo -n '; total_cnt '$total_cnt >>$resfile
+    echo -n '; nonf_cnt '$nonf_cnt >>$resfile
+    echo    '; avg_nf '$avg_nf >>$resfile
 }
 
 function get_nearest(){
@@ -90,7 +91,7 @@ for ((i=0; i<${#VIPs[@]}; i=i+1)); do
     tmp="/tmp/live-rusty-cat-res-$vip_name-other.log"
     cat `find . -name "*$vip_name*"` > $tmp
     resfile=$RES_DIR/$vip_name.log
-    $(cac $tmp $resfile $vip_name)
+    $(cac $tmp $resfile "$vip_name"_All)
     echo "=====" >> $resfile
 
     #split
@@ -108,9 +109,24 @@ for ((i=0; i<${#VIPs[@]}; i=i+1)); do
     done
     echo "====" >> $resfile
     echo "nearest:" ${nearest[@]} >> $resfile
-    $(cac $nearest_file $resfile "$name-$op-Nearest")
+    $(cac $nearest_file $resfile "$vip_name"_Nearest)
+
+    echo "" > $nearest_file
+    fastest=(`grep 'aggr' $resfile | tr -s [:space:] | sort -n -k 7 -t ' ' | head -4 | cut -d ':' -f 1`)
+    for f in `find . -name "*$vip_name*"`; do
+        tmp_name=`dirname $f`
+        tmp_name=`basename $tmp_name`
+        if echo "${fastest[@]}" | grep -w "$tmp_name" &> /dev/null; then
+            cat $f >> $nearest_file
+        fi
+    done
+    echo "====" >> $resfile
+    echo "fastest:" ${fastest[@]} >> $resfile
+    $(cac $nearest_file $resfile "$vip_name"_Fastest)
+
 
     # summary
-    grep $vip_name $resfile >> $SUM_RES_FILE
-    grep "Nearest" $resfile >> $NEAR_RES_FILE
+    grep $vip_name $resfile | sed s/.*All/$vip_name/ >> $SUM_RES_FILE
+    grep "Nearest" $resfile | sed s/.*Nearest/$vip_name/ >> $NEAR_RES_FILE
+    grep "Fastest" $resfile | sed s/.*Fastest/$vip_name/ >> $FAST_RES_FILE
 done

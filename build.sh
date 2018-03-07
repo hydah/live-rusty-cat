@@ -28,6 +28,7 @@ cp -rf logs/ live-rusty-cat
 cp -rf video/ live-rusty-cat
 cp -rf resource/ live-rusty-cat
 cp -rf scripts/ live-rusty-cat
+mkdir -p live-rusty-cat/result
 rm -rf live-rusty-cat/logs/*
 tar czvf live-rusty-cat.tgz live-rusty-cat
 rm -rf live-rusty-cat

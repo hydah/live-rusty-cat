@@ -49163,7 +49163,6 @@ int srs_utils_parse_sei_profiling(char *data, int size, SrsJDProfilingSeiPacket 
     stream.initialize(data, size);
 
     packet->decode(&stream);
-    srs_human_trace("size is %d", packet->get_size());
 
     return 0;
 }
