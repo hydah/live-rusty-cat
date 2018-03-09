@@ -35,7 +35,7 @@ gcc srs_ingest_flv.c ../../objs/lib/srs_librtmp.a -g -O0 -lstdc++ -o srs_ingest_
 #include "srs_librtmp.h"
 using namespace std;
 
-int proxy(srs_flv_t flv, srs_rtmp_t ortmp, bool recur);
+int proxy(srs_flv_t flv, srs_rtmp_t ortmp, int recur);
 int connect_oc(srs_rtmp_t ortmp);
 
 #define RE_PULSE_MS 300
@@ -46,7 +46,7 @@ void re_cleanup(int64_t re, int32_t starttime, u_int32_t time);
 
 int64_t tools_main_entrance_startup_time;
 
-static const char *optString = "i:y:r?";
+static const char *optString = "i:y:r:";
 
 void print_header()
 {
@@ -74,7 +74,7 @@ void print_usage(char *name)
            name, name, name);
 }
 
-void parse_flag(int argc, char** argv, string &input_file, string &tc_url, bool &recur)
+void parse_flag(int argc, char** argv, string &input_file, string &tc_url, int &recur)
 {
     if (argc <= 2) {
         print_usage(argv[0]);
@@ -82,7 +82,7 @@ void parse_flag(int argc, char** argv, string &input_file, string &tc_url, bool 
     }
 
     int opt;
-    recur = false;
+    recur = 1;
     while ((opt = getopt(argc, argv, optString)) != -1) {
         switch(opt) {
             case 'i':
@@ -92,7 +92,7 @@ void parse_flag(int argc, char** argv, string &input_file, string &tc_url, bool 
                 tc_url = optarg;
                 break;
             case 'r':
-                recur = true;
+                recur = atoi(optarg);
                 break;
             case '?':
                 print_usage(argv[0]);
@@ -110,7 +110,7 @@ int main(int argc, char** argv)
     srs_rtmp_t ortmp;
     srs_flv_t flv;
     string input_file, url;
-    bool recur;
+    int recur;
 
     tools_main_entrance_startup_time = srs_utils_time_ms();
     parse_flag(argc, argv, input_file, url, recur);
@@ -125,7 +125,7 @@ int main(int argc, char** argv)
 
     srs_human_trace("input:  %s", input_file.c_str());
     srs_human_trace("output: %s", url.c_str());
-    srs_human_trace("recur: %s", recur ? "true" : "false");
+    srs_human_trace("recur: %d", recur);
 
     if ((flv = srs_flv_open_read(input_file.c_str())) == NULL) {
         ret = 2;
@@ -144,7 +144,7 @@ int main(int argc, char** argv)
     return ret;
 }
 
-int do_proxy(srs_flv_t flv, srs_rtmp_t ortmp, int64_t re, int32_t* pstarttime, u_int32_t* ptimestamp)
+int do_proxy(srs_flv_t flv, srs_rtmp_t ortmp, int64_t base, int64_t re, int32_t* pstarttime, u_int32_t* ptimestamp)
 {
     int ret = 0;
 
@@ -160,7 +160,7 @@ int do_proxy(srs_flv_t flv, srs_rtmp_t ortmp, int64_t re, int32_t* pstarttime, u
         now = srs_utils_time_ms();
         if (now - last_timestamp >= 3000) {
             last_timestamp = now;
-            if((ret = inject_profiling_packet_sei(ortmp, now, *ptimestamp)) != 0) {
+            if((ret = inject_profiling_packet_sei(ortmp, now, *ptimestamp+base)) != 0) {
                 return ret;
             }
         }
@@ -187,7 +187,7 @@ int do_proxy(srs_flv_t flv, srs_rtmp_t ortmp, int64_t re, int32_t* pstarttime, u
 
         u_int32_t timestamp = *ptimestamp;
         // make sure srs_rtmp_write_packet will delete data in any conditions
-        if ((ret = srs_rtmp_write_packet(ortmp, type, *ptimestamp, data, size)) != 0) {
+        if ((ret = srs_rtmp_write_packet(ortmp, type, *ptimestamp+base, data, size)) != 0) {
             srs_human_trace("irtmp get packet failed. ret=%d", ret);
             goto out;
         }
@@ -207,7 +207,7 @@ out:
     return ret;
 }
 
-int proxy(srs_flv_t flv, srs_rtmp_t ortmp, bool recur)
+int proxy(srs_flv_t flv, srs_rtmp_t ortmp, int recur)
 {
     int ret = 0;
     u_int32_t timestamp = 0;
@@ -217,9 +217,12 @@ int proxy(srs_flv_t flv, srs_rtmp_t ortmp, bool recur)
         return ret;
     }
 
+    int64_t base_time = srs_utils_time_ms();
+    int64_t base = 0;
     do {
-        starttime = -1;
         timestamp = 0;
+        starttime = -1;
+        base = srs_utils_time_ms() - base_time;
         tools_main_entrance_startup_time = srs_utils_time_ms();
         if ((ret = srs_flv_read_header(flv, header)) != 0) {
             return ret;
@@ -227,14 +230,15 @@ int proxy(srs_flv_t flv, srs_rtmp_t ortmp, bool recur)
 
         int64_t re = re_create();
 
-        ret = do_proxy(flv, ortmp, re, &starttime, &timestamp);
+        ret = do_proxy(flv, ortmp, base, re, &starttime, &timestamp);
 
 
         // for the last pulse, always sleep.
         re_cleanup(re, starttime, timestamp);
         srs_flv_lseek(flv, 0);
 
-    } while(recur && ret == 0);
+        recur--;
+    } while(recur > 0 && ret == 0);
 
     return ret;
 }
