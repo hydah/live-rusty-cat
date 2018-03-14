@@ -13,10 +13,12 @@ fi
 logfile=$WORK_DIR/logs/rtmp-self.log.$lasthour
 RESFILE=$WORK_DIR/result/rtmp-self.txt
 
-echo $lasthour >> $RESFILE
-sh $WORK_DIR/scripts/analyse_res.sh $logfile >> $RESFILE
-if [ $? -eq 0 ]; then
-    rm $logfile
+if [ -f $logfile ]; then
+    echo $lasthour >> $RESFILE
+    sh $WORK_DIR/scripts/analyse_res.sh $logfile >> $RESFILE
+    if [ $? -eq 0 ]; then
+        rm $logfile
+    fi
 fi
 # for rtmp-other.sh
 

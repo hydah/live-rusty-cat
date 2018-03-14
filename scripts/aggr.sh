@@ -21,7 +21,7 @@ for file in `ls *.$CUR_TIME`; do
 done
 popd
 
-if `ls $LOG_DIR/*.$CUR_TIME`; do
+if ls $LOG_DIR/*.$CUR_TIME; then
     pushd /tmp
     tar czvf $WORK_DIR/result/$DEST_DIR.tgz $DEST_DIR
     popd
