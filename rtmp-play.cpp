@@ -237,7 +237,7 @@ rtmp_destroy:
              << SRS_JFIELD_STR("address", input_url) << SRS_JFIELD_CONT
              << SRS_JFIELD_ORG("handshake_time", handshake_time-start_time) << SRS_JFIELD_CONT
              << SRS_JFIELD_ORG("connection_time", connection_time-start_time) << SRS_JFIELD_CONT
-             << SRS_JFIELD_ORG("firstItime", first_frame_time-start_time) << SRS_JFIELD_CONT
+             << SRS_JFIELD_ORG("first_itime", first_frame_time-start_time) << SRS_JFIELD_CONT
              << SRS_JFIELD_ORG("total_count", total_count) << SRS_JFIELD_CONT
              << SRS_JFIELD_ORG("nonfluency_count", nonfluency_count) << SRS_JFIELD_CONT
              << SRS_JFIELD_ORG("nonfluency_rate", nonfluency_rate) << SRS_JFIELD_CONT
@@ -249,7 +249,7 @@ rtmp_destroy:
         cout << endl;
 
     } else {
-        printf("address %s, firstItime %ld, total_count %ld, nonfluency_count %ld, nonfluency_rate %.2f, sei_frame_count %d",
+        printf("address %s, first_itime %ld, total_count %ld, nonfluency_count %ld, nonfluency_rate %.2f, sei_frame_count %d",
                input_url, first_frame_time - start_time, total_count, nonfluency_count, nonfluency_rate, sei_count);
         printf(", e2e %d, e2relay %d, e2edge %d", avg_e2e, avg_e2relay, avg_e2edge);
         printf("\n");
