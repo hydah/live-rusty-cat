@@ -1,21 +1,26 @@
 #!/bin/sh
-# $1
-# $2
+# $1 每小时聚合的rtmp-other数据 tgz
+# $2 分析结果存放目录
+
 WORK_DIR=`dirname $0`
 WORK_DIR=`cd ${WORK_DIR}/../..; pwd`
 RES_DIR=$2
-rm -rf $RES_DIR
-mkdir -p $RES_DIR
 SUM_RES_FILE=$RES_DIR/all.log
 NEAR_RES_FILE=$RES_DIR/nearest.log
 FAST_RES_FILE=$RES_DIR/fastest.log
-#$1 is the tar file
 
 HOSTNAME=`hostname`
 
 NAME=`basename $1`
-DEST_DIR=/tmp/${NAME%.*}
+TMP_DIR=/tmp/${NAME%.*}
 
+function clr() {
+    mkdir -p $RES_DIR
+    rm $SUM_RES_FILE
+    rm $NEAR_RES_FILE
+    rm $FAST_RES_FILE
+    rm $RES_DIR/*VIP.log
+}
 
 function get_vips() {
     VIPs=`cat $WORK_DIR/resource/edge_vip.json | grep VIP | cut -d '"' -f 2`
@@ -74,11 +79,12 @@ function get_nearest(){
     echo $nearest
 }
 
-rm -rf $DEST_DIR
+clr
+rm -rf $TMP_DIR
 tar xf $1 -C /tmp
-pushd $DEST_DIR
 
-for zf in `ls $DEST_DIR/*.tgz`; do
+pushd $TMP_DIR
+for zf in `ls $TMP_DIR/*.tgz`; do
     tar xf $zf
 done
 VIPs=($(get_vips))
@@ -91,7 +97,7 @@ for ((i=0; i<${#VIPs[@]}; i=i+1)); do
     nearest=($(get_nearest $op $name))
 
     tmp="/tmp/live-rusty-cat-res-$vip_name-other.log"
-    cat `find $DEST_DIR -name "*$vip_name*"` > $tmp
+    cat `find $TMP_DIR -name "*$vip_name*"` > $tmp
     resfile=$RES_DIR/$vip_name.log
     $(cac $tmp $resfile "$vip_name"_All)
     echo "=====" >> $resfile
@@ -99,7 +105,7 @@ for ((i=0; i<${#VIPs[@]}; i=i+1)); do
     #split
     nearest_file="/tmp/live-rusty-cat-res-$vip_name-nearest.log"
     echo "" > $nearest_file
-    for f in `find $DEST_DIR -name "*$vip_name*"`; do
+    for f in `find $TMP_DIR -name "*$vip_name*"`; do
         tmp_name=`dirname $f`
         tmp_name=`basename $tmp_name`
         oname=`echo $tmp_name | cut -d '-' -f 2`
@@ -115,7 +121,7 @@ for ((i=0; i<${#VIPs[@]}; i=i+1)); do
 
     echo "" > $nearest_file
     fastest=(`grep 'aggr' $resfile | tr -s [:space:] | sort -n -k 7 -t ' ' | head -4 | cut -d ':' -f 1`)
-    for f in `find $DEST_DIR -name "*$vip_name*"`; do
+    for f in `find $TMP_DIR -name "*$vip_name*"`; do
         tmp_name=`dirname $f`
         tmp_name=`basename $tmp_name`
         if echo "${fastest[@]}" | grep -w "$tmp_name" &> /dev/null; then

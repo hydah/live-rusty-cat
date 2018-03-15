@@ -3,13 +3,28 @@
 # see: https://github.com/winlinvip/simple-rtmp-server/wiki/v2_CN_SrsLibrtmp
     gcc main.cpp srs_librtmp.cpp -g -O0 -lstdc++ -o output
 */
-//#include <windows.h>
+#include <iostream>
 #include <stdio.h>
 #include <stdlib.h>
 #include <sys/time.h>
 #include <sstream>
 #include <signal.h>
 #include "librtmp/srs_librtmp.h"
+using namespace std;
+
+#define SRS_JOBJECT_START "{"
+#define SRS_JFIELD_NAME(k) "\"" << k << "\":"
+#define SRS_JFIELD_OBJ(k) SRS_JFIELD_NAME(k) << SRS_JOBJECT_START
+#define SRS_JFIELD_STR(k, v) SRS_JFIELD_NAME(k) << "\"" << v << "\""
+#define SRS_JFIELD_ORG(k, v) SRS_JFIELD_NAME(k) << std::dec << v
+#define SRS_JFIELD_BOOL(k, v) SRS_JFIELD_ORG(k, (v? "true":"false"))
+#define SRS_JFIELD_NULL(k) SRS_JFIELD_NAME(k) << "null"
+#define SRS_JFIELD_ERROR(ret) "\"" << "code" << "\":" << ret
+#define SRS_JFIELD_CONT ","
+#define SRS_JOBJECT_END "}"
+#define SRS_JARRAY_START "["
+#define SRS_JARRAY_END "]"
+
 #define SrsVideoAvcFrameTraitNALU 1
 #define SrsVideoAvcFrameTypeKeyFrame 1
 #define SrsVideoAvcFrameTypeInterFrame 2
@@ -33,13 +48,14 @@ void print_usage(int argc, char** argv)
 static long count_interval = 1000;
 static long total_time = 10000;
 bool print_sum = false;
+bool print_json = false;
 bool print_detail = false;
 char *input_url = NULL;
 bool parse_metadata = false;
 
 void parse_configure(int argc, char** argv)
 {
-    const char *optString = "i:t:r:dms";
+    const char *optString = "i:t:r:dmsj";
     char opt;
     while ((opt = getopt(argc, argv, optString)) != -1) {
         switch(opt) {
@@ -62,6 +78,9 @@ void parse_configure(int argc, char** argv)
             case 's':
                 print_sum = true;
                 break;
+            case 'j':
+                print_json = true;
+                break;
             case '?':
                 print_usage(argc, argv);
                 exit(-1);
@@ -77,7 +96,7 @@ void parse_configure(int argc, char** argv)
     return;
 }
 
-void sig_handler(int sig )
+void sig_handler(int sig)
 {
     if (sig == SIGINT) {
         keep_running = 0;
@@ -91,6 +110,7 @@ int main(int argc, char** argv)
 	int frame_count = 0, total_count = 0;
 	int is_firstI = 0, nonfluency_count = 0;
 	long start_time = 0, first_frame_time = 0;
+    long handshake_time = 0, connection_time = 0;
 	int64_t last_time, now_time, interval;
     int64_t e2e = 0, e2relay = 0, e2edge = 0, sei_count = 0;
     float nonfluency_rate = 0;
@@ -115,10 +135,12 @@ int main(int argc, char** argv)
         srs_human_trace("simple handshake failed.");
         goto rtmp_destroy;
     }
+    handshake_time = srs_utils_time_ms();
     if (srs_rtmp_connect_app(rtmp) != 0) {
         srs_human_trace("connect vhost/app failed.");
         goto rtmp_destroy;
     }
+    connection_time = srs_utils_time_ms();
     if (srs_rtmp_play_stream(rtmp) != 0) {
         srs_human_trace("play stream failed.");
         goto rtmp_destroy;
@@ -203,12 +225,35 @@ int main(int argc, char** argv)
 
 
 rtmp_destroy:
-    printf("address %s, firstItime %ld, total_count %ld, nonfluency_count %ld, nonfluency_rate %.2f, sei_frame_count %d",
-           input_url, first_frame_time - start_time, total_count, nonfluency_count, nonfluency_rate, sei_count);
+    int avg_e2e = 0, avg_e2relay = 0, avg_e2edge = 0;
     if (sei_count > 0) {
-        printf(", e2e %d, e2relay %d, e2edge %d",e2e/sei_count, e2relay/sei_count, e2edge/sei_count);
+        avg_e2e = e2e/sei_count;
+        avg_e2relay = e2relay/sei_count;
+        avg_e2edge = e2edge/sei_count;
     }
-    printf("\n");
+
+    if (print_json == true) {
+        cout << SRS_JOBJECT_START
+             << SRS_JFIELD_STR("address", input_url) << SRS_JFIELD_CONT
+             << SRS_JFIELD_ORG("handshake_time", handshake_time-start_time) << SRS_JFIELD_CONT
+             << SRS_JFIELD_ORG("connection_time", connection_time-start_time) << SRS_JFIELD_CONT
+             << SRS_JFIELD_ORG("firstItime", first_frame_time-start_time) << SRS_JFIELD_CONT
+             << SRS_JFIELD_ORG("total_count", total_count) << SRS_JFIELD_CONT
+             << SRS_JFIELD_ORG("nonfluency_count", nonfluency_count) << SRS_JFIELD_CONT
+             << SRS_JFIELD_ORG("nonfluency_rate", nonfluency_rate) << SRS_JFIELD_CONT
+             << SRS_JFIELD_ORG("sei_frame_count", sei_count) << SRS_JFIELD_CONT
+             << SRS_JFIELD_ORG("e2e", avg_e2e) << SRS_JFIELD_CONT
+             << SRS_JFIELD_ORG("e2relay", avg_e2relay) << SRS_JFIELD_CONT
+             << SRS_JFIELD_ORG("e2edge", avg_e2edge)
+             << SRS_JOBJECT_END;
+        cout << endl;
+
+    } else {
+        printf("address %s, firstItime %ld, total_count %ld, nonfluency_count %ld, nonfluency_rate %.2f, sei_frame_count %d",
+               input_url, first_frame_time - start_time, total_count, nonfluency_count, nonfluency_rate, sei_count);
+        printf(", e2e %d, e2relay %d, e2edge %d", avg_e2e, avg_e2relay, avg_e2edge);
+        printf("\n");
+    }
     srs_rtmp_destroy(rtmp);
     return 0;
 }
