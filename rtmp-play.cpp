@@ -249,8 +249,8 @@ rtmp_destroy:
         cout << endl;
 
     } else {
-        printf("address %s, first_itime %ld, total_count %ld, nonfluency_count %ld, nonfluency_rate %.2f, sei_frame_count %d",
-               input_url, first_frame_time - start_time, total_count, nonfluency_count, nonfluency_rate, sei_count);
+        printf("address %s, handshake_time %d, connection_time %d, first_itime %ld, total_count %ld, nonfluency_count %ld, nonfluency_rate %.2f, sei_frame_count %d",
+               input_url, handshake_time - start_time, connection_time - start_time, first_frame_time - start_time, total_count, nonfluency_count, nonfluency_rate, sei_count);
         printf(", e2e %d, e2relay %d, e2edge %d", avg_e2e, avg_e2relay, avg_e2edge);
         printf("\n");
     }

@@ -5,7 +5,7 @@ import re
 from influxdb import InfluxDBClient
 import time
 
-xs=[("avg_iframe", float), ("avg_e2e", float), ("total_cnt", int), ("try_times", int), ("fail_times", int), ("nonf_cnt", int), ("avg_nf", float)]
+xs=[("avg_handshake", float), ("avg_connection", float), ("avg_iframe", float), ("avg_e2e", float), ("total_cnt", int), ("try_times", int), ("fail_times", int), ("nonf_cnt", int), ("avg_nf", float)]
 logf=sys.argv[1]
 ts=sys.argv[2]
 ts_trans = time.strftime("%Y-%m-%d %H:%M:%S", time.strptime(ts, "%Y-%m-%d-%H"))
