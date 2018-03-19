@@ -135,12 +135,12 @@ int main(int argc, char** argv)
         srs_human_trace("simple handshake failed.");
         goto rtmp_destroy;
     }
-    handshake_time = srs_utils_time_ms();
+    handshake_time = srs_utils_time_ms() - start_time;
     if (srs_rtmp_connect_app(rtmp) != 0) {
         srs_human_trace("connect vhost/app failed.");
         goto rtmp_destroy;
     }
-    connection_time = srs_utils_time_ms();
+    connection_time = srs_utils_time_ms() - start_time;
     if (srs_rtmp_play_stream(rtmp) != 0) {
         srs_human_trace("play stream failed.");
         goto rtmp_destroy;
@@ -201,7 +201,7 @@ int main(int argc, char** argv)
 	    if((avc_packet_type == SrsVideoAvcFrameTraitNALU) && (frame_type == SrsVideoAvcFrameTypeKeyFrame || frame_type == SrsVideoAvcFrameTypeInterFrame)){
 		    frame_count++;
 	        if(is_firstI == 0 && frame_type == SrsVideoAvcFrameTypeKeyFrame){
-                first_frame_time = now_time;
+                first_frame_time = now_time - start_time;
                 if (!print_sum && print_detail) {
                     srs_human_trace("play stream start and the first I frame arrive at %ld ms.",first_frame_time);
                 }
@@ -235,9 +235,9 @@ rtmp_destroy:
     if (print_json == true) {
         cout << SRS_JOBJECT_START
              << SRS_JFIELD_STR("address", input_url) << SRS_JFIELD_CONT
-             << SRS_JFIELD_ORG("handshake_time", handshake_time-start_time) << SRS_JFIELD_CONT
-             << SRS_JFIELD_ORG("connection_time", connection_time-start_time) << SRS_JFIELD_CONT
-             << SRS_JFIELD_ORG("first_itime", first_frame_time-start_time) << SRS_JFIELD_CONT
+             << SRS_JFIELD_ORG("handshake_time", handshake_time) << SRS_JFIELD_CONT
+             << SRS_JFIELD_ORG("connection_time", connection_time) << SRS_JFIELD_CONT
+             << SRS_JFIELD_ORG("first_itime", first_frame_time) << SRS_JFIELD_CONT
              << SRS_JFIELD_ORG("total_count", total_count) << SRS_JFIELD_CONT
              << SRS_JFIELD_ORG("nonfluency_count", nonfluency_count) << SRS_JFIELD_CONT
              << SRS_JFIELD_ORG("nonfluency_rate", nonfluency_rate) << SRS_JFIELD_CONT
@@ -249,8 +249,8 @@ rtmp_destroy:
         cout << endl;
 
     } else {
-        printf("address %s, handshake_time %d, connection_time %d, first_itime %ld, total_count %ld, nonfluency_count %ld, nonfluency_rate %.2f, sei_frame_count %d",
-               input_url, handshake_time - start_time, connection_time - start_time, first_frame_time - start_time, total_count, nonfluency_count, nonfluency_rate, sei_count);
+        printf("address %s, handshake_time %d, connection_time %d, first_itime %d, total_count %d, nonfluency_count %d, nonfluency_rate %.2f, sei_frame_count %d",
+               input_url, handshake_time, connection_time, first_frame_time, total_count, nonfluency_count, nonfluency_rate, sei_count);
         printf(", e2e %d, e2relay %d, e2edge %d", avg_e2e, avg_e2relay, avg_e2edge);
         printf("\n");
     }
