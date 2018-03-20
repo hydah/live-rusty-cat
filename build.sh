@@ -12,7 +12,7 @@ if [ ! -d $BIN ]; then
 fi
 
 
-g++ -o $OUTPUT/rtmp-play rtmp-play.cpp librtmp/srs_librtmp.cpp -I librtmp
+g++ -o $OUTPUT/rtmp-play rtmp-play.cpp rtmp-tool.cpp librtmp/srs_librtmp.cpp -I librtmp
 #g++ -o $OUTPUT/rtmp-ts rtmp-play-timestamp.cpp librtmp/srs_librtmp.cpp -I librtmp
 g++ -o $OUTPUT/rtmp-publish rtmp-publish.cpp librtmp/srs_librtmp.cpp -I librtmp
 
