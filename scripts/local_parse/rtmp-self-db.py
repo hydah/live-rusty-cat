@@ -4,7 +4,7 @@ import sys
 import os
 import re
 
-xs=[("avg_handshake", float), ("avg_connection", float), ("avg_iframe", float), ("avg_e2e", float), ("total_cnt", int), ("try_times", int), ("fail_times", int), ("nonf_cnt", int), ("avg_nf", float)]
+xs=[("avg_handshake", float), ("avg_connection", float), ("avg_iframe", float), ("avg_e2e", float), ("duration", int), ("try_times", int), ("fail_times", int), ("waiting_time", int), ("waiting_rate", float)]
 logf=sys.argv[1]
 ts=sys.argv[2]
 
@@ -19,7 +19,7 @@ def parse_each():
         name = os.path.basename(logf)[:-4]
 
         for line in f.readlines():
-            doc = {"name": "", "time": ts, "try_times": 0, "fail_times": 0, "avg_iframe": 0, "avg_e2e": 0.0, "total_cnt": 0, "nonf_cnt": 0, "avg_nf": 0.0}
+            doc = {"name": "", "source": "", "time": ts, "try_times": 0, "fail_times": 0, "avg_iframe": 0, "avg_e2e": 0.0, "duration": 0, "waiting_time": 0, "waiting_rate": 0.0}
             name = line.split(':')[0]
             doc["name"]= name.strip()
             if not 'RTMP' in name:

@@ -6,7 +6,7 @@ import os
 import re
 
 #doc = {"time": "", "name": "", "avg_iframe": "", "avg_e2e": "", "total_cnt": "", "try_times": "", "fail_times": "", "nonf_cnt": "", "avg_nf": ""}
-xs=[("avg_handshake", float), ("avg_connection", float), ("avg_iframe", float), ("avg_e2e", float), ("total_cnt", int), ("try_times", int), ("fail_times", int), ("nonf_cnt", int), ("avg_nf", float)]
+xs=[("avg_handshake", float), ("avg_connection", float), ("avg_iframe", float), ("avg_e2e", float), ("duration", int), ("try_times", int), ("fail_times", int), ("waiting_time", int), ("waiting_rate", float)]
 directory=sys.argv[1]
 ts=sys.argv[2]
 
@@ -23,7 +23,7 @@ def parse_all():
         for line in f.readlines():
             name = get_name(line)
 
-            doc = {"time": "2018-03-05-17", "name": "", "avg_iframe": 0, "avg_e2e": 0.0, "total_cnt": 0, "try_times": 0, "fail_times": 0, "nonf_cnt": 0, "avg_nf": 0.0}
+            doc = {"time": "2018-03-05-17", "name": "", "avg_iframe": 0, "avg_e2e": 0.0, "duration": 0, "try_times": 0, "fail_times": 0, "waiting_time": 0, "waiting_rate": 0.0}
             for k in xs:
                 pattern = r".*{} (.*?)[;|\n$]".format(k[0])
                 tmp_obj = re.match(pattern, line)
@@ -71,7 +71,7 @@ def parse_each():
                 name = os.path.basename(path)[:-4]
 
                 for line in f.readlines():
-                    doc = {"name": "", "source": "", "time": ts, "try_times": 0, "fail_times": 0, "avg_iframe": 0, "avg_e2e": 0.0, "total_cnt": 0, "nonf_cnt": 0, "avg_nf": 0.0}
+                    doc = {"name": "", "source": "", "time": ts, "try_times": 0, "fail_times": 0, "avg_iframe": 0, "avg_e2e": 0.0, "duration": 0, "waiting_time": 0, "waiting_rate": 0.0}
                     first = line.split(':')[0]
                     if not 'RTMP' in first:
                         continue
