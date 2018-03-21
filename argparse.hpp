@@ -159,13 +159,13 @@ private:
             char variable_nargs;
         };
         bool fixed;
-        String realName() const { return (name.empty()) ? short_name : name; }
-        String canonicalName() const { return (name.empty()) ? short_name : short_name + "|" + name; }
+        String canonicalName() const { return (name.empty()) ? short_name : name; }
+        String realName() const { return (name.empty()) ? short_name : short_name + "|" + name; }
         String toString(bool named = true) const {
             std::ostringstream s;
             String uname = name.empty() ? upper(strip(short_name)) : upper(strip(name));
             if (named && optional) s << "[";
-            if (named) s << canonicalName();
+            if (named) s << realName();
             if (fixed) {
                 size_t N = std::min((size_t)3, fixed_nargs);
                 for (size_t n = 0; n < N; ++n) s << " " << uname;
@@ -355,6 +355,14 @@ public:
         if (index_.count(delimit(name)) == 0) throw std::out_of_range("Key not found");
         size_t N = index_[delimit(name)];
         return variables_[N].castTo<T>();
+    }
+
+    template <typename T>
+    T& get(const String& name) {
+        String temp = retrieve<String>(name);
+        T _value;
+        if (std::istringstream(temp) >> _value) return _value;
+        else throw std::out_of_range("can't cast");
     }
 
     // --------------------------------------------------------------------------

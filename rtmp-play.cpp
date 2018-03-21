@@ -18,16 +18,21 @@ using namespace std;
 
 struct LiveRes{
     string addr;
-    int total_count;
-    int nonfluency_count;
-    float nonfluency_rate;
+    int64_t e2e;
+    int64_t e2relay;
+    int64_t e2edge;
+    int runtime;
+    int waittime;
     int sei_count;
     int handshake_time;
     int connection_time;
     int first_frame_time;
-    int64_t e2e;
-    int64_t e2relay;
-    int64_t e2edge;
+    LiveRes() {
+        addr = "";
+        e2e = e2relay = e2edge = 0;
+        runtime = waittime = handshake_time = connection_time = first_frame_time = 0;
+        sei_count = 0;
+    };
 };
 
 struct Config {
@@ -47,14 +52,14 @@ struct Config {
         parser.parse(argc, argv);
         only_sum = parser.valid("s");
         debug = parser.valid("d");
-        show_json = parser.valid("l");
+        show_json = parser.valid("j");
         addr = parser.retrieve<string>("i");
         if (parser.valid("t")) {
-            total_time = parser.retrieve<int>("t");
+            total_time = parser.get<int>("t");
         }
 
         if (parser.valid("r")) {
-            count_interval = parser.retrieve<int>("r");
+            count_interval = parser.get<int>("r");
         }
     }
 } config;
@@ -75,6 +80,7 @@ void run(LiveRes &live_res)
     int frame_count = 0;
     bool is_firstI = false;
     int64_t now_time, interval;
+    uint32_t last_ts = 0;
     srs_rtmp_t rtmp = NULL;
 
     start_time = srs_utils_time_ms();
@@ -115,22 +121,31 @@ void run(LiveRes &live_res)
             int ret = 0;
 
             now_time = srs_utils_time_ms();
-            int64_t interval = now_time - last_time ;
-            if (interval >= config.count_interval) {
-                float fps = float(frame_count*1000)/interval;
-                if(fps < 15.0){
-                    live_res.nonfluency_count++;
-                }
-                log(DEBUG, "play stream past %ld ms, frame count is %d, fps is %.2f.",interval,frame_count,fps);
-                live_res.total_count++;
-                frame_count = 0;
-                last_time = now_time;
-            }
 
             // if this func is non-block, it will be better.
             if ((ret = srs_rtmp_read_packet(rtmp, &type, &timestamp, &data, &size, &stream_id)) != 0) {
                 log(ERROR, "read packet error, errno is %d", ret);
                 break;
+            }
+
+            char frame_type = srs_utils_flv_video_frame_type(data, size);
+            char avc_packet_type = srs_utils_flv_video_avc_packet_type(data, size);
+            now_time = srs_utils_time_ms();
+            if((avc_packet_type == SrsVideoAvcFrameTraitNALU)
+                && (frame_type == SrsVideoAvcFrameTypeKeyFrame || frame_type == SrsVideoAvcFrameTypeInterFrame)){
+                frame_count++;
+                int64_t tmp_time = srs_utils_time_ms();
+                int _wt = int(tmp_time - last_time) - int(timestamp - last_ts);
+                if (_wt > 0) {
+                    live_res.waittime += _wt;
+                    last_time = tmp_time;
+                    last_ts = timestamp;
+                }
+                if(is_firstI == false && frame_type == SrsVideoAvcFrameTypeKeyFrame){
+                    live_res.first_frame_time = now_time - start_time;
+                    log(DEBUG, "play stream start and the first I frame arrive at %ld ms.", live_res.first_frame_time);
+                    is_firstI = true;
+                }
             }
 
             if (false && srs_utils_is_metadata(type, data, size)) {
@@ -145,29 +160,10 @@ void run(LiveRes &live_res)
                 log(INFO, "node timestamp \n %s", ss.str().c_str());
             }
 
-            char frame_type = srs_utils_flv_video_frame_type(data, size);
-            char avc_packet_type = srs_utils_flv_video_avc_packet_type(data, size);
-            now_time = srs_utils_time_ms();
-            if((avc_packet_type == SrsVideoAvcFrameTraitNALU)
-                && (frame_type == SrsVideoAvcFrameTypeKeyFrame || frame_type == SrsVideoAvcFrameTypeInterFrame)){
-                frame_count++;
-                if(is_firstI == false && frame_type == SrsVideoAvcFrameTypeKeyFrame){
-                    live_res.first_frame_time = now_time - start_time;
-                    log(DEBUG, "play stream start and the first I frame arrive at %ld ms.", live_res.first_frame_time);
-                    is_firstI = true;
-                }
-            }
-
             delete data;
         }
     }
 
-    if(live_res.total_count != 0) {
-        live_res.nonfluency_rate = float(live_res.nonfluency_count)/live_res.total_count;
-    }
-    if(live_res.first_frame_time == 0) {
-        live_res.nonfluency_rate = 100;
-    }
     log(INFO, "play stream end");
 
 rtmp_destroy:
@@ -186,12 +182,11 @@ void print_result(LiveRes &live_res, bool print_json) {
     if (print_json == true) {
         cout << SRS_JOBJECT_START
              << SRS_JFIELD_STR("address", live_res.addr) << SRS_JFIELD_CONT
+             << SRS_JFIELD_ORG("duration", live_res.runtime) << SRS_JFIELD_CONT
              << SRS_JFIELD_ORG("handshake_time", live_res.handshake_time) << SRS_JFIELD_CONT
              << SRS_JFIELD_ORG("connection_time", live_res.connection_time) << SRS_JFIELD_CONT
              << SRS_JFIELD_ORG("first_itime", live_res.first_frame_time) << SRS_JFIELD_CONT
-             << SRS_JFIELD_ORG("total_count", live_res.total_count) << SRS_JFIELD_CONT
-             << SRS_JFIELD_ORG("nonfluency_count", live_res.nonfluency_count) << SRS_JFIELD_CONT
-             << SRS_JFIELD_ORG("nonfluency_rate", live_res.nonfluency_rate) << SRS_JFIELD_CONT
+             << SRS_JFIELD_ORG("waiting_time", live_res.waittime) << SRS_JFIELD_CONT
              << SRS_JFIELD_ORG("sei_frame_count", live_res.sei_count) << SRS_JFIELD_CONT
              << SRS_JFIELD_ORG("e2e", avg_e2e) << SRS_JFIELD_CONT
              << SRS_JFIELD_ORG("e2relay", avg_e2relay) << SRS_JFIELD_CONT
@@ -200,8 +195,9 @@ void print_result(LiveRes &live_res, bool print_json) {
         cout << endl;
 
     } else {
-        printf("address %s, handshake_time %d, connection_time %d, first_itime %d, total_count %d, nonfluency_count %d, nonfluency_rate %.2f, sei_frame_count %d",
-               live_res.addr.c_str(), live_res.handshake_time, live_res.connection_time, live_res.first_frame_time, live_res.total_count, live_res.nonfluency_count, live_res.nonfluency_rate, live_res.sei_count);
+        printf("address %s, handshake_time %d, connection_time %d, first_itime %d, duration %d, waiting_time %d, sei_frame_count %d",
+               live_res.addr.c_str(), live_res.handshake_time, live_res.connection_time, live_res.first_frame_time,
+               live_res.runtime, live_res.waittime, live_res.sei_count);
         printf(", e2e %d, e2relay %d, e2edge %d", avg_e2e, avg_e2relay, avg_e2edge);
         printf("\n");
     }
@@ -220,6 +216,7 @@ int main(int argc, const char** argv)
 
     LiveRes live_res;
     live_res.addr = config.addr;
+    live_res.runtime = config.total_time;
     if (config.only_sum) {
         init_loglevel(SUM);
     } else if (config.debug) {

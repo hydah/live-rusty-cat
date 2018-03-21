@@ -4,6 +4,13 @@ fail_times=`grep 'total_count 0' $1 | wc -l`
 grep 'address' $1  | grep -v 'total_count 0' > $tmpfile
 suc_times=`cat $tmpfile | wc -l`
 
+avg_handshake=9999999
+avg_connection=9999999
+avg_iframe=9999999
+avg_e2e=9999999
+total_cnt=0
+nonf_cnf=0
+
 if [ $suc_times -gt 0 ]; then
     # grep -Po 'connection_time.*?(,|$)' | grep -Eo  '[0-9]+'
     # address rtmp://play.jcloud.com/profiling/avatar, handshake_time 63, connection_time 334, firstItime 399, total_count 6, nonfluency_count 0, nonfluency_rate 0.00, sei_frame_count 4, e2e 202, e2relay 168, e2edge 42
