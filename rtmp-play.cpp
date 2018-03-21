@@ -136,7 +136,7 @@ void run(LiveRes &live_res)
                 frame_count++;
                 int64_t tmp_time = srs_utils_time_ms();
                 int _wt = int(tmp_time - last_time) - int(timestamp - last_ts);
-                if (_wt > 0) {
+                if (is_firstI && _wt > 0) {
                     live_res.waittime += _wt;
                     last_time = tmp_time;
                     last_ts = timestamp;
@@ -145,6 +145,8 @@ void run(LiveRes &live_res)
                     live_res.first_frame_time = now_time - start_time;
                     log(DEBUG, "play stream start and the first I frame arrive at %ld ms.", live_res.first_frame_time);
                     is_firstI = true;
+                    last_time = tmp_time;
+                    last_ts = timestamp;
                 }
             }
 
