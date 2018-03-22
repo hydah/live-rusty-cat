@@ -6,7 +6,7 @@ import os
 import re
 
 #doc = {"time": "", "name": "", "avg_iframe": "", "avg_e2e": "", "total_cnt": "", "try_times": "", "fail_times": "", "nonf_cnt": "", "avg_nf": ""}
-xs=[("avg_handshake", float), ("avg_connection", float), ("avg_iframe", float), ("avg_e2e", float), ("duration", int), ("try_times", int), ("fail_times", int), ("waiting_time", int), ("waiting_rate", float)]
+xs=[("avg_handshake", float), ("avg_connection", float), ("avg_iframe", float), ("avg_e2e", float), ("run_time", int), ("total_time", int), ("try_times", int), ("fail_times", int), ("waiting_time", int), ("waiting_rate", float)]
 directory=sys.argv[1]
 ts=sys.argv[2]
 
@@ -71,7 +71,7 @@ def parse_each():
                 name = os.path.basename(path)[:-4]
 
                 for line in f.readlines():
-                    doc = {"name": "", "source": "", "time": ts, "try_times": 0, "fail_times": 0, "avg_iframe": 0, "avg_e2e": 0.0, "duration": 0, "waiting_time": 0, "waiting_rate": 0.0}
+                    doc = {"name": "", "source": "", "time": ts, "try_times": 0, "fail_times": 0, "avg_iframe": 0, "avg_e2e": 0.0, "run_time": 0, "total_time": 0, "waiting_time": 0, "waiting_rate": 0.0}
                     first = line.split(':')[0]
                     if not 'RTMP' in first:
                         continue
