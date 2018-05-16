@@ -11,7 +11,7 @@ void log(int loglevel, const char *format, ...)
         return;
     }
 
-    char buffer[256];
+    char buffer[10000];
     va_list args;
     va_start(args, format);
     vsprintf(buffer,format, args);

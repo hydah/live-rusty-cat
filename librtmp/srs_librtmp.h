@@ -1266,7 +1266,8 @@ extern int srs_rtmp_connect_app2(srs_rtmp_t rtmp,
     char srs_primary[128], char srs_authors[128],
     char srs_version[32], int* srs_id, int* srs_pid
 );
-
+extern int srs_rtmp_fast_handshake_play(srs_rtmp_t rtmp);
+extern int srs_rtmp_fast_handshake_publish(srs_rtmp_t rtmp);
 /**
  * Deprecated, use srs_human_format_rtmp_packet instead.
  */
@@ -1275,6 +1276,8 @@ extern int srs_human_print_rtmp_packet2(char type, uint32_t timestamp, char* dat
 extern int srs_human_print_rtmp_packet3(char type, uint32_t timestamp, char* data, int size, uint32_t pre_timestamp, int64_t pre_now);
 extern int srs_human_print_rtmp_packet4(char type, uint32_t timestamp, char* data, int size, uint32_t pre_timestamp, int64_t pre_now,
     int64_t starttime, int64_t nb_packets);
+
+
 
 #ifdef __cplusplus
 }

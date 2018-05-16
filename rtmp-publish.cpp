@@ -24,6 +24,7 @@ CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 gcc srs_ingest_flv.c ../../objs/lib/srs_librtmp.a -g -O0 -lstdc++ -o srs_ingest_flv
 */
 #include <iostream>
+#include <fstream>
 #include <sstream>
 #include <stdio.h>
 #include <unistd.h>
@@ -36,6 +37,8 @@ gcc srs_ingest_flv.c ../../objs/lib/srs_librtmp.a -g -O0 -lstdc++ -o srs_ingest_
 using namespace std;
 
 int proxy(srs_flv_t flv, srs_rtmp_t ortmp, int recur);
+int do_proxy(srs_flv_t flv, srs_rtmp_t ortmp, int64_t base, int64_t re, int32_t* pstarttime, u_int32_t* ptimestamp);
+
 int connect_oc(srs_rtmp_t ortmp);
 
 #define RE_PULSE_MS 300
@@ -46,7 +49,7 @@ void re_cleanup(int64_t re, int32_t starttime, u_int32_t time);
 
 int64_t tools_main_entrance_startup_time;
 
-static const char *optString = "i:y:r:";
+static const char *optString = "i:y:f:r:";
 
 void print_header()
 {
@@ -65,7 +68,7 @@ void print_usage(char *name)
         name = "null";
     }
     printf("ingest flv file and publish to RTMP server\n"
-           "Usage: %s <-i in_flv_file> <-y out_rtmp_url>\n"
+           "Usage: %s <-i in_flv_file>|<-f input_file_list> <-y out_rtmp_url> <-r>\n"
            "   in_flv_file     input flv file, ingest from this file.\n"
            "   out_rtmp_url    output rtmp url, publish to this url.\n"
            "For example:\n"
@@ -74,7 +77,7 @@ void print_usage(char *name)
            name, name, name);
 }
 
-void parse_flag(int argc, char** argv, string &input_file, string &tc_url, int &recur)
+void parse_flag(int argc, char** argv, string &input_file, string &concat_txt, string &tc_url, int &recur)
 {
     if (argc <= 2) {
         print_usage(argv[0]);
@@ -90,6 +93,9 @@ void parse_flag(int argc, char** argv, string &input_file, string &tc_url, int &
                 break;
             case 'y':
                 tc_url = optarg;
+                break;
+            case 'f':
+                concat_txt = optarg;
                 break;
             case 'r':
                 recur = atoi(optarg);
@@ -109,37 +115,89 @@ int main(int argc, char** argv)
     int ret = 0;
     srs_rtmp_t ortmp;
     srs_flv_t flv;
-    string input_file, url;
+    string input_file, url, concat_txt;
     int recur;
 
     tools_main_entrance_startup_time = srs_utils_time_ms();
-    parse_flag(argc, argv, input_file, url, recur);
-    if (input_file.empty()) {
-        srs_human_trace("input invalid, use -i <input>");
+    parse_flag(argc, argv, input_file, concat_txt, url, recur);
+    if (input_file.empty() && concat_txt.empty()) {
+        srs_human_trace("input invalid, use -i <input> or -f <concat_txt>");
         return -1;
     }
     if (url.empty()) {
         srs_human_trace("output invalid, use -y <output>");
         return -1;
     }
-
-    srs_human_trace("input:  %s", input_file.c_str());
+    if (!concat_txt.empty()) {
+        srs_human_trace("concat_txt: %s", concat_txt.c_str());
+    } else {
+        srs_human_trace("input:  %s", input_file.c_str());
+    }
     srs_human_trace("output: %s", url.c_str());
     srs_human_trace("recur: %d", recur);
 
-    if ((flv = srs_flv_open_read(input_file.c_str())) == NULL) {
-        ret = 2;
-        srs_human_trace("open flv file failed. ret=%d", ret);
-        return ret;
+    if (!concat_txt.empty()) {
+        ortmp = srs_rtmp_create(url.c_str());
+        int ret = 0;
+        u_int32_t timestamp = 0;
+        int32_t starttime = -1;
+        char header[13];
+        if ((ret = connect_oc(ortmp)) != 0) {
+            return ret;
+        }
+
+        int64_t base_time = srs_utils_time_ms();
+        int64_t base = 0;
+        do {
+            ifstream fin(concat_txt.c_str(), ios::in);
+            string f;
+            while(getline(fin, f)) {
+                if ((flv = srs_flv_open_read(f.c_str())) == NULL) {
+                    ret = 2;
+                    srs_human_trace("open flv file %s failed. ret=%d", f.c_str(), ret);
+                    break;
+                }
+
+                timestamp = 0;
+                starttime = -1;
+                base = srs_utils_time_ms() - base_time;
+                tools_main_entrance_startup_time = srs_utils_time_ms();
+                if ((ret = srs_flv_read_header(flv, header)) != 0) {
+                    srs_flv_close(flv);
+                    break;
+                }
+
+                int64_t re = re_create();
+
+                ret = do_proxy(flv, ortmp, base, re, &starttime, &timestamp);
+                if (ret != 0) {
+                    srs_flv_close(flv);
+                    break;
+                }
+
+                // for the last pulse, always sleep.
+                re_cleanup(re, starttime, timestamp);
+                srs_flv_close(flv);
+           }
+           recur--;
+           fin.close();
+         } while(recur > 0 && ret == 0);
+    } else {
+
+        if ((flv = srs_flv_open_read(input_file.c_str())) == NULL) {
+            ret = 2;
+            srs_human_trace("open flv file failed. ret=%d", ret);
+            return ret;
+        }
+
+        ortmp = srs_rtmp_create(url.c_str());
+
+        ret = proxy(flv, ortmp, recur);
+        srs_human_trace("ingest flv to RTMP completed");
+
+        srs_rtmp_destroy(ortmp);
+        srs_flv_close(flv);
     }
-
-    ortmp = srs_rtmp_create(url.c_str());
-
-    ret = proxy(flv, ortmp, recur);
-    srs_human_trace("ingest flv to RTMP completed");
-
-    srs_rtmp_destroy(ortmp);
-    srs_flv_close(flv);
 
     return ret;
 }

@@ -17,9 +17,9 @@
 #define SrsVideoAvcFrameTypeInterFrame 2
 
 enum log_level {
-    ERROR = 0,
+    SUM = 0,
+    ERROR,
     WARNING,
-    SUM,
     INFO,
     DEBUG,
 };
@@ -27,3 +27,5 @@ extern int LOG_LEVEL;
 
 void log(int loglevel, const char *format, ...);
 void init_loglevel(int loglevel);
+#define ERROR_SUCCESS                       0
+

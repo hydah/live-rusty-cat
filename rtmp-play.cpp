@@ -15,6 +15,8 @@
 
 using namespace std;
 
+#define CUR_TIME srs_utils_time_ms()
+
 struct LiveRes{
     string addr;
     int64_t e2e;
@@ -24,6 +26,8 @@ struct LiveRes{
     int runtime;
     int waittime;
     int sei_count;
+    int dns_resolve_time;
+    int connect_server_time;
     int handshake_time;
     int connection_time;
     int first_frame_time;
@@ -43,20 +47,30 @@ struct Config {
     bool show_json;
     bool only_sum;
     bool debug;
+    bool complex_hs;
+    bool fast_hs;
     Config() {
         total_time = 10000;
         show_json = only_sum = debug = false;
+        complex_hs = false;
+        fast_hs = false;
     };
     void parse(int argc, const char **argv) {
         parser.parse(argc, argv);
         only_sum = parser.valid("s");
         debug = parser.valid("d");
         show_json = parser.valid("j");
+        fast_hs = parser.valid("F");
         addr = parser.retrieve<string>("i");
         if (parser.valid("t")) {
             total_time = parser.get<int>("t");
         }
-
+        if (parser.valid("H")) {
+            string hs_type = parser.retrieve<string>("H");
+            if (hs_type == "complex") {
+                complex_hs = true;
+            }
+        }
     }
 } config;
 bool stop_playing = false;
@@ -87,27 +101,55 @@ void run(LiveRes &live_res)
     // set 4s timeout
     srs_rtmp_set_timeout(rtmp, 4000, 4000);
 
-    if (srs_rtmp_handshake(rtmp) != 0) {
-        log(ERROR, "simple handshake failed.");
-        goto rtmp_destroy;
-    }
-    log(INFO, "simple handshake success");
-    live_res.handshake_time = srs_utils_time_ms() - start_time;
 
-    if (srs_rtmp_connect_app(rtmp) != 0) {
-        log(ERROR, "connect vhost/app failed.");
+    if (srs_rtmp_dns_resolve(rtmp) != ERROR_SUCCESS) {
+        log(ERROR, "dns resolve failed.");
         goto rtmp_destroy;
     }
-    log(INFO, "connect vhost/app success");
-    live_res.connection_time = srs_utils_time_ms() - start_time;
+    live_res.dns_resolve_time = CUR_TIME - start_time;
 
-    if (srs_rtmp_play_stream(rtmp) != 0) {
-        log(ERROR, "play stream failed.");
+    if (srs_rtmp_connect_server(rtmp) != ERROR_SUCCESS) {
+        log(ERROR, "connect to server faild.");
         goto rtmp_destroy;
     }
-    log(INFO, "play stream success");
+    live_res.connect_server_time = CUR_TIME - start_time;
+
+    if (config.fast_hs) {
+        if (srs_rtmp_fast_handshake_play(rtmp)!= ERROR_SUCCESS) {
+            log(ERROR, "fast handshake failed.");
+            goto rtmp_destroy;
+        }
+    } else {
+        if (config.complex_hs) {
+            if (srs_rtmp_do_complex_handshake(rtmp) != ERROR_SUCCESS) {
+                log(ERROR, "simple handshake failed.");
+                goto rtmp_destroy;
+            }
+        } else {
+            if (srs_rtmp_do_simple_handshake(rtmp) != ERROR_SUCCESS) {
+                log(ERROR, "complex handshake failed.");
+                goto rtmp_destroy;
+            }
+        }
+        live_res.handshake_time = CUR_TIME - start_time;
+        log(INFO, "handshake success");
+
+        if (srs_rtmp_connect_app(rtmp) != 0) {
+            log(ERROR, "connect vhost/app failed.");
+            goto rtmp_destroy;
+        }
+        log(INFO, "connect vhost/app success");
+        live_res.connection_time = srs_utils_time_ms() - start_time;
+
+        if (srs_rtmp_play_stream(rtmp) != 0) {
+            log(ERROR, "play stream failed.");
+            goto rtmp_destroy;
+        }
+        log(INFO, "play stream success");
+    }
 
     last_time = srs_utils_time_ms();
+    char buffer[500];
     while(!stop_playing) {
         int size;
         char type;
@@ -148,7 +190,7 @@ void run(LiveRes &live_res)
             }
         }
 
-        if (false && srs_utils_is_metadata(type, data, size)) {
+        if (srs_utils_is_metadata(type, data, size)) {
             std::stringstream ms;
             srs_print_metadata(data, size, ms);
             log(INFO, "metadata is \n %s", ms.str().c_str());
@@ -159,7 +201,11 @@ void run(LiveRes &live_res)
             live_res.sei_count++;
             log(INFO, "node timestamp \n %s", ss.str().c_str());
         }
-
+        if (config.debug) {
+            memset(buffer, 0, sizeof(char)*500);
+            srs_human_format_rtmp_packet(buffer, 100, type, timestamp, data, size);
+            log(INFO, buffer);
+        }
         delete data;
     }
 
@@ -191,6 +237,8 @@ void print_result(LiveRes &live_res, bool print_json) {
              << SRS_JFIELD_STR("address", live_res.addr) << SRS_JFIELD_CONT
              << SRS_JFIELD_ORG("total_time", live_res.total_time) << SRS_JFIELD_CONT
              << SRS_JFIELD_ORG("run_time", live_res.runtime) << SRS_JFIELD_CONT
+             << SRS_JFIELD_ORG("dns_resolve_time", live_res.dns_resolve_time) << SRS_JFIELD_CONT
+             << SRS_JFIELD_ORG("connect_servier_time", live_res.connect_server_time) << SRS_JFIELD_CONT
              << SRS_JFIELD_ORG("handshake_time", live_res.handshake_time) << SRS_JFIELD_CONT
              << SRS_JFIELD_ORG("connection_time", live_res.connection_time) << SRS_JFIELD_CONT
              << SRS_JFIELD_ORG("first_itime", live_res.first_frame_time) << SRS_JFIELD_CONT
@@ -203,9 +251,11 @@ void print_result(LiveRes &live_res, bool print_json) {
         cout << endl;
 
     } else {
-        printf("address %s, handshake_time %d, total_time %d, connection_time %d, first_itime %d, run_time %d, waiting_time %d, sei_frame_count %d",
-               live_res.addr.c_str(), live_res.handshake_time, live_res.total_time, live_res.connection_time, live_res.first_frame_time,
-               live_res.runtime, live_res.waittime, live_res.sei_count);
+        printf("address %s, total_time %d, run_time %d, dns_resolve_time %d, connect_server_time %d, handshake_time %d, "
+               "connection_time %d, first_itime %d, waiting_time %d, sei_frame_count %d",
+               live_res.addr.c_str(), live_res.total_time, live_res.runtime, live_res.dns_resolve_time,
+               live_res.connect_server_time, live_res.handshake_time, live_res.connection_time, live_res.first_frame_time,
+               live_res.waittime, live_res.sei_count);
         printf(", e2e %d, e2relay %d, e2edge %d", avg_e2e, avg_e2relay, avg_e2edge);
         printf("\n");
     }
@@ -218,6 +268,8 @@ int main(int argc, const char** argv)
     config.parser.addArgument("-d", "--debug", 0, true, "\tprint all the debug info");
     config.parser.addArgument("-s", "--only_summary", 0, true, "only print summary");
     config.parser.addArgument("-j", "--json", 0, true, "\tprint summary with json fomat");
+    config.parser.addArgument("-F", "--fast_hs", 0, true, "\tuse fast handshake");
+    config.parser.addArgument("-H", "--handshake", 1, true, "handshake type, will use complex handshake only if specified 'complex'");
     config.parser.addFinalArgument("null", 0);
     config.parse(argc, argv);
 

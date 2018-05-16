@@ -1,6 +1,7 @@
 PWD=`pwd`
 OUTPUT="$PWD/output"
 BIN="$PWD/bin"
+LIBS="$PWD/libs"
 
 if [ -d $OUTPUT ]; then
     rm -rf $OUTPUT
@@ -11,10 +12,9 @@ if [ ! -d $BIN ]; then
     mkdir $BIN
 fi
 
-
-g++ -g -o $OUTPUT/rtmp-play rtmp-play.cpp rtmp-tool.cpp librtmp/srs_librtmp.cpp -I librtmp
+g++ -o2 -o $OUTPUT/rtmp-play rtmp-play.cpp rtmp-tool.cpp librtmp/srs_librtmp.cpp $LIBS/openssl/lib/libssl.a $LIBS/openssl/lib/libcrypto.a -I librtmp -I $LIBS/openssl/include -ldl
 #g++ -o $OUTPUT/rtmp-ts rtmp-play-timestamp.cpp librtmp/srs_librtmp.cpp -I librtmp
-g++ -g -o $OUTPUT/rtmp-publish rtmp-publish.cpp librtmp/srs_librtmp.cpp -I librtmp
+g++ -o2 -o $OUTPUT/rtmp-publish rtmp-publish.cpp librtmp/srs_librtmp.cpp -I librtmp
 
 chmod +x $OUTPUT/rtmp-play
 chmod +x $OUTPUT/rtmp-publish
