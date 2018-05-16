@@ -1066,10 +1066,12 @@ extern ISrsThreadContext* _srs_context;
 #if 1
     #define srs_verbose(msg, ...) _srs_log->verbose(NULL, _srs_context->get_id(), msg, ##__VA_ARGS__)
     #define srs_info(msg, ...)    _srs_log->info(NULL, _srs_context->get_id(), msg, ##__VA_ARGS__)
-    //#define srs_trace(msg, ...)   _srs_log->trace(NULL, _srs_context->get_id(), msg, ##__VA_ARGS__)
+    #define srs_trace(msg, ...)   _srs_log->trace(NULL, _srs_context->get_id(), msg, ##__VA_ARGS__)
+    /*
     #define srs_trace(msg, ...) \
         fprintf(stdout, "[T][%d][%s] ", getpid(), srs_human_format_time());\
         fprintf(stdout, msg, ##__VA_ARGS__); fprintf(stdout, "\n")
+        */
     #define srs_warn(msg, ...)    _srs_log->warn(NULL, _srs_context->get_id(), msg, ##__VA_ARGS__)
     #define srs_error(msg, ...)   _srs_log->error(NULL, _srs_context->get_id(), msg, ##__VA_ARGS__)
 #endif
