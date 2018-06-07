@@ -83,9 +83,7 @@ void sig_handler(int sig)
     }
 }
 
-// todo:
-// use buffer time, not frame rate
-void run(LiveRes &live_res)
+void do_rtmp(LiveRes &live_res)
 {
     int64_t start_time, last_time;
     int frame_count = 0;
@@ -224,6 +222,91 @@ rtmp_destroy:
     return;
 }
 
+void do_file(LiveRes &live_res)
+{
+    int64_t start_time, last_time;
+    int frame_count = 0;
+    bool is_firstI = false;
+    int ret;
+    int64_t now_time, interval;
+    uint32_t last_ts = 0, timestamp = 0;;
+    srs_rtmp_t rtmp = NULL;
+
+    start_time = srs_utils_time_ms();
+    last_time = srs_utils_time_ms();
+    char buffer[600];
+    char header[13];
+    char *data = NULL;
+    srs_flv_t flv;
+    log(INFO, "play local file");
+
+    if ((flv = srs_flv_open_read(live_res.addr.c_str())) == NULL) {
+        log(ERROR, "open flv file failed");
+        return;
+    }
+
+    if ((ret = srs_flv_read_header(flv, header)) != 0) {
+        srs_flv_close(flv);
+        return;
+    }
+    while(!stop_playing) {
+       int size;
+       char type;
+       uint32_t timestamp;
+
+       // tag header
+       if ((ret = srs_flv_read_tag_header(flv, &type, &size, &timestamp)) != 0) {
+           if (srs_flv_is_eof(ret)) {
+               log(INFO, "parse completed.");
+               break;
+           }
+           log(ERROR, "flv get packet failed. ");
+           break;
+       }
+
+       if (size <= 0) {
+           log(INFO, "invalid size=%d", size);
+           break;
+       }
+
+      // TODO: FIXME: mem leak when error.
+      data = new char[size];
+      if ((ret = srs_flv_read_tag_data(flv, data, size)) != 0) {
+          goto free_data;
+      }
+       if (config.debug) {
+           memset(buffer, 0, sizeof(char)*600);
+           srs_human_format_rtmp_packet(buffer, 200, type, timestamp, data, size);
+           log(INFO, buffer);
+       }
+       delete [] data;
+   }
+
+free_data:
+    if (data) {
+        delete []data;
+    }
+    srs_flv_close(flv);
+    return;
+}
+
+void do_http(LiveRes &live_res)
+{
+}
+// todo:
+// use buffer time, not frame rate
+void run(LiveRes &live_res)
+{
+    log(INFO, "addr is %s", live_res.addr.c_str());
+    if (live_res.addr.find("http://") == 0) {
+        do_http(live_res);
+    } else if (live_res.addr.find("rtmp://") == 0) {
+        do_rtmp(live_res);
+    } else {
+        do_file(live_res);
+    }
+}
+
 void print_result(LiveRes &live_res, bool print_json) {
     int avg_e2e = 0, avg_e2relay = 0, avg_e2edge = 0;
     if (live_res.sei_count > 0) {
@@ -285,7 +368,7 @@ int main(int argc, const char** argv)
     log(INFO, "suck rtmp stream like rtmpdump");
     log(INFO, "srs(simple-rtmp-server) client librtmp library.");
     log(INFO, "version: %d.%d.%d", srs_version_major(), srs_version_minor(), srs_version_revision());
-    log(INFO, "rtmp url: %s", live_res.addr.c_str());
+    log(INFO, "url: %s", live_res.addr.c_str());
     log(INFO, "total_time: %d", config.total_time);
 
     signal(SIGALRM, sig_handler);

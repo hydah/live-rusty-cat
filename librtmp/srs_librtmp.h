@@ -251,6 +251,7 @@ extern int srs_rtmp_play_stream(srs_rtmp_t rtmp);
 * @return 0, success; otherwise, failed.
 */
 extern int srs_rtmp_publish_stream(srs_rtmp_t rtmp);
+extern int srs_rtmp_fmle_unpublish_stream(srs_rtmp_t rtmp);
 
 /**
 * do bandwidth check with srs server.
@@ -318,6 +319,7 @@ extern int srs_rtmp_write_packet(srs_rtmp_t rtmp,
 extern int inject_profiling_packet(srs_rtmp_t ortmp, int64_t now, int64_t timestamp);
 
 extern int inject_profiling_packet_sei(srs_rtmp_t ortmp, int64_t now, int64_t timestamp);
+extern int inject_h264_stream_eof_packet(srs_rtmp_t ortmp, int64_t timestamp);
 extern bool srs_utils_is_sei_profiling(char type, char * data, int size);
 extern void srs_print_sei_profiling(char *data, int size, std::stringstream &ss, int64_t &e2e, int64_t &e2edge, int64_t &e2relay);
 extern void srs_print_metadata(char *data, int size, std::stringstream &ss);

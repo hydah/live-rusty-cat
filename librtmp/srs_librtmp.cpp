@@ -2408,6 +2408,7 @@ public:
     static bool acceptable(char* data, int size);
     static bool sei(char *data, int size);
     static bool sei_profiling(char *data, int size);
+    static int  h264_nalu_type(char *data, int size);
 };
 
 /**
@@ -8671,7 +8672,7 @@ public:
                 }
                 return ret;
             }
-            srs_human_trace("recv message success.");
+            srs_trace("recv message success.");
 
             SrsPacket* packet = NULL;
             if ((ret = decode_message(msg, &packet)) != ERROR_SUCCESS) {
@@ -8683,7 +8684,7 @@ public:
 
             T* pkt = dynamic_cast<T*>(packet);
             if (!pkt) {
-                srs_human_trace("drop message(type=%d, size=%d, time=%"PRId64", sid=%d).",
+                srs_trace("drop message(type=%d, size=%d, time=%"PRId64", sid=%d).",
                     msg->header.message_type, msg->header.payload_length,
                     msg->header.timestamp, msg->header.stream_id);
                 srs_freep(msg);
@@ -9064,6 +9065,7 @@ public:
      *       connect-app => FMLE publish
      */
     virtual int fmle_publish(std::string stream, int& stream_id);
+    virtual int fmle_unpublish(std::string stream, int& stream_id);
 public:
     /**
      * expect a specified message, drop others util got specified one.
@@ -9614,6 +9616,7 @@ protected:
 public:
     static SrsFMLEStartPacket* create_release_stream(std::string stream);
     static SrsFMLEStartPacket* create_FC_publish(std::string stream);
+    static SrsFMLEStartPacket* create_FC_unpublish(std::string stream);
 };
 /**
 * response for SrsFMLEStartPacket.
@@ -10171,6 +10174,19 @@ public:
     virtual int get_size();
 };
 
+class SrsH264StreamEOFPacket : public SrsPacket {
+    public:
+    int8_t frame_type;
+    int8_t packet_type;
+    int32_t cts;
+    int32_t nalu_length;
+    int8_t nalu_type;
+    SrsH264StreamEOFPacket();
+    ~SrsH264StreamEOFPacket();
+    virtual int encode_packet(SrsBuffer *stream);
+    virtual int decode(SrsBuffer *stream);
+    virtual int get_size();
+};
 /**
 * 5.5. Window Acknowledgement Size (5)
 * The client or the server sends this message to inform the peer which
@@ -18942,6 +18958,20 @@ bool SrsFlvVideo::sei(char *data, int size)
     }
 
     return true;
+}
+
+int SrsFlvVideo::h264_nalu_type(char *data, int size)
+{
+    if (!h264(data, size)) {
+        return -1;
+    }
+
+    if (size < 9) {
+        return -1;
+    }
+
+    uint8_t nalu_header = *(data+9);
+    return nalu_header & 0x1F;
 }
 
 bool SrsFlvVideo::sei_profiling(char *data, int size)
@@ -31793,9 +31823,11 @@ int SrsProtocol::do_simple_send(SrsMessageHeader* mh, char* payload, int size)
     return ret;
 }
 
+/*
 #define srs_info(msg, ...) \
        fprintf(stdout, "[T][%d][%s] ", getpid(), srs_human_format_time());\
        fprintf(stdout, msg, ##__VA_ARGS__); fprintf(stdout, "\n")
+*/
 
 int SrsProtocol::do_decode_message(SrsMessageHeader& header, SrsBuffer* stream, SrsPacket** ppacket)
 {
@@ -33710,6 +33742,23 @@ int SrsRtmpClient::fmle_publish(string stream, int& stream_id)
     return ret;
 }
 
+int SrsRtmpClient::fmle_unpublish(string stream, int& stream_id) {
+    stream_id = 0;
+
+    int ret = ERROR_SUCCESS;
+
+    // FCUnPublish
+    if (true) {
+        SrsFMLEStartPacket* pkt = SrsFMLEStartPacket::create_FC_unpublish(stream);
+        if ((ret = protocol->send_and_free_packet(pkt, 0)) != ERROR_SUCCESS) {
+            srs_error("send FMLE unpublish "
+                "FCPublish failed. stream=%s, ret=%d", stream.c_str(), ret);
+            return ret;
+        }
+    }
+
+    return ret;
+}
 
 SrsFastHandshakePacket::SrsFastHandshakePacket()
 {
@@ -35690,6 +35739,17 @@ SrsFMLEStartPacket* SrsFMLEStartPacket::create_FC_publish(string stream)
     return pkt;
 }
 
+SrsFMLEStartPacket* SrsFMLEStartPacket::create_FC_unpublish(string stream)
+{
+    SrsFMLEStartPacket* pkt = new SrsFMLEStartPacket();
+
+    pkt->command_name = RTMP_AMF0_COMMAND_UNPUBLISH;
+    pkt->transaction_id = 3;
+    pkt->stream_name = stream;
+
+    return pkt;
+}
+
 SrsFMLEStartResPacket::SrsFMLEStartResPacket(double _transaction_id)
 {
     command_name = RTMP_AMF0_COMMAND_RESULT;
@@ -37061,6 +37121,108 @@ int SrsJDProfilingSeiPacket::decode(SrsBuffer *stream)
     nalu_length = stream->read_4bytes();
 
     return sei_nalu->decode(stream);
+}
+
+SrsH264StreamEOFPacket::SrsH264StreamEOFPacket()
+{
+    frame_type = 0x27;
+    packet_type = 1;
+    cts = 0;
+    nalu_length = 0;
+    nalu_type = 11;
+}
+
+SrsH264StreamEOFPacket::~SrsH264StreamEOFPacket()
+{
+}
+int SrsH264StreamEOFPacket::get_size()
+{
+    return 9 +1;
+}
+
+int SrsH264StreamEOFPacket::encode_packet(SrsBuffer* stream)
+{
+
+    int ret;
+
+    if (!stream->require(1)) {
+        ret = ERROR_RTMP_MESSAGE_ENCODE;
+        srs_error("encode AvcSei packet failed. ret=%d", ret);
+        return ret;
+    }
+    stream->write_1bytes(frame_type);
+
+    if (!stream->require(1)) {
+        ret = ERROR_RTMP_MESSAGE_ENCODE;
+        srs_error("encode AvcSei packet failed. ret=%d", ret);
+        return ret;
+    }
+    stream->write_1bytes(packet_type);
+
+    if (!stream->require(3)) {
+        ret = ERROR_RTMP_MESSAGE_ENCODE;
+        srs_error("encode AvcSei packet failed. ret=%d", ret);
+        return ret;
+    }
+    stream->write_3bytes(cts);
+
+    nalu_length = 1;
+    if (!stream->require(4)) {
+        ret = ERROR_RTMP_MESSAGE_ENCODE;
+        srs_error("encode AvcSei packet failed. ret=%d", ret);
+        return ret;
+    }
+    stream->write_4bytes(nalu_length);
+
+    if (!stream->require(1)) {
+        ret = ERROR_RTMP_MESSAGE_DECODE;
+        return ret;
+    }
+    stream->write_1bytes(nalu_type);
+
+    return ret;
+}
+
+int SrsH264StreamEOFPacket::decode(SrsBuffer *stream)
+{
+    int ret;
+
+    if (!stream->require(1)) {
+        ret = ERROR_RTMP_MESSAGE_DECODE;
+        srs_error("decode SrsH264StreamEOFPacket failed. ret=%d", ret);
+        return ret;
+    }
+    frame_type = stream->read_1bytes();
+
+    if (!stream->require(1)) {
+        ret = ERROR_RTMP_MESSAGE_DECODE;
+        srs_error("decode SrsH264StreamEOFPacket failed. ret=%d", ret);
+        return ret;
+    }
+    packet_type = stream->read_1bytes();
+
+    if (!stream->require(3)) {
+        ret = ERROR_RTMP_MESSAGE_DECODE;
+        srs_error("decode SrsH264StreamEOFPacket failed. ret=%d", ret);
+        return ret;
+    }
+    cts = stream->read_3bytes();
+
+    if (!stream->require(4)) {
+        ret = ERROR_RTMP_MESSAGE_DECODE;
+        srs_error("decode SrsH264StreamEOFPacket failed. ret=%d", ret);
+        return ret;
+    }
+    nalu_length = stream->read_4bytes();
+
+    if (!stream->require(1)) {
+        ret = ERROR_RTMP_MESSAGE_DECODE;
+        srs_error("decode SrsH264StreamEOFPacket failed. ret=%d", ret);
+        return ret;
+    }
+    nalu_type = stream->read_1bytes();
+
+    return ret;
 }
 
 SrsSetWindowAckSizePacket::SrsSetWindowAckSizePacket()
@@ -48358,6 +48520,24 @@ int srs_rtmp_publish_stream(srs_rtmp_t rtmp)
     return ret;
 }
 
+int srs_rtmp_send_end_of_stream_packet(srs_rtmp_t rtmp)
+{
+}
+int srs_rtmp_fmle_unpublish_stream(srs_rtmp_t rtmp)
+{
+
+     int ret = ERROR_SUCCESS;
+
+    srs_assert(rtmp != NULL);
+    Context* context = (Context*)rtmp;
+
+    if ((ret = context->rtmp->fmle_unpublish(context->stream, context->stream_id)) != ERROR_SUCCESS) {
+        return ret;
+    }
+
+    return ret;
+}
+
 int srs_rtmp_bandwidth_check(srs_rtmp_t rtmp,
     int64_t* start_time, int64_t* end_time,
     int* play_kbps, int* publish_kbps,
@@ -48692,6 +48872,37 @@ free_payload:
 free_packet:
     srs_freep(sei_packet);
 
+    return ret;
+}
+
+int inject_h264_stream_eof_packet(srs_rtmp_t ortmp, int64_t timestamp)
+{
+    SrsH264StreamEOFPacket *packet = new SrsH264StreamEOFPacket();
+    char type = SrsFrameTypeVideo;
+    int size = 0;
+    char* payload = NULL;
+    int ret = 0;
+
+
+    if ((ret = packet->encode(size, payload)) != ERROR_SUCCESS) {
+        srs_error("encode h264 stream eof packet error. ret=%d", ret);
+        goto free_payload;
+    }
+    srs_human_trace("encode h264 stream eof packet success. %d", size);
+
+    if (size <= 0) {
+        srs_warn("ignore the invalid h264 stream eof packet data. size=%d", size);
+        goto free_payload;
+   }
+    if ((ret = srs_rtmp_write_packet(ortmp, type, timestamp, payload, size)) != 0) {
+        srs_human_trace("irtmp get packet failed. ret=%d", ret);
+    }
+    goto free_packet;
+
+free_payload:
+    srs_freepa(payload);
+free_packet:
+    srs_freep(packet);
     return ret;
 }
 
@@ -49833,6 +50044,15 @@ bool srs_utils_is_sei_profiling(char type, char * data, int size)
     return SrsFlvVideo::sei_profiling(data, size);
 }
 
+int srs_utils_h264_nalu_type(char type, char *data, int size)
+{
+    if (type != SRS_RTMP_TYPE_VIDEO) {
+        return -1;
+    }
+
+    return SrsFlvVideo::h264_nalu_type(data, size);
+}
+
 int srs_utils_parse_sei_profiling(char *data, int size, SrsJDProfilingSeiPacket *packet)
 {
     int ret = -1;
@@ -50056,6 +50276,35 @@ const char* srs_human_flv_tag_type2string(char type)
     return unknown;
 }
 
+
+const string srs_human_flv_h264_nalu_type2string(int type)
+{
+
+    switch (type) {
+        case SrsAvcNaluTypeNonIDR: return "NonIDR";
+        case SrsAvcNaluTypeDataPartitionA: return "DataPartitionA";
+        case SrsAvcNaluTypeDataPartitionB: return "DataPartitionB";
+        case SrsAvcNaluTypeDataPartitionC: return "DataPartitionC";
+        case SrsAvcNaluTypeIDR: return "IDR";
+        case SrsAvcNaluTypeSEI: return "SEI";
+        case SrsAvcNaluTypeSPS: return "SPS";
+        case SrsAvcNaluTypePPS: return "PPS";
+        case SrsAvcNaluTypeAccessUnitDelimiter: return "AccessUnitDelimiter";
+        case SrsAvcNaluTypeEOSequence: return "EOSequence";
+        case SrsAvcNaluTypeEOStream: return "EOStream";
+        case SrsAvcNaluTypeFilterData: return "FilterData";
+        case SrsAvcNaluTypeSPSExt: return "SPSExt";
+        case SrsAvcNaluTypePrefixNALU: return "PrefixNALU";
+        case SrsAvcNaluTypeSubsetSPS: return "SubsetSPS";
+        case SrsAvcNaluTypeLayerWithoutPartition: return "LayerWithoutPartition";
+        case SrsAvcNaluTypeCodedSliceExt: return "CodedSliceExt";
+        case SrsAvcNaluTypeReserved: default: return "Other";
+    }
+
+
+
+}
+
 const char* srs_human_flv_video_codec_id2string(char codec_id)
 {
     static const char* h263 = "H.263";
@@ -50227,7 +50476,7 @@ int srs_human_format_rtmp_packet(char* buffer, int nb_buffer, char type, uint32_
     // Initialize to empty NULL terminated string.
     buffer[0] = 0;
 
-    char sbytes[40];
+    char sbytes[80];
     if (true) {
         int nb = srs_min(8, size);
         int p = 0;
@@ -50244,10 +50493,12 @@ int srs_human_format_rtmp_packet(char* buffer, int nb_buffer, char type, uint32_
     }
 
     if (type == SRS_RTMP_TYPE_VIDEO) {
-        snprintf(buffer, nb_buffer, "Video packet type=%s, dts=%d, pts=%d, size=%d, %s(%s,%s), (%s)",
+        snprintf(buffer, nb_buffer, "Video packet type=%s, dts=%d, pts=%d, size=%d, %s(%s:%d,%s), (%s)",
             srs_human_flv_tag_type2string(type), timestamp, pts, size,
             srs_human_flv_video_codec_id2string(srs_utils_flv_video_codec_id(data, size)),
             srs_human_flv_video_avc_packet_type2string(srs_utils_flv_video_avc_packet_type(data, size)),
+            //srs_human_flv_h264_nalu_type2string(srs_utils_h264_nalu_type(type,data, size)).c_str(),
+            srs_utils_h264_nalu_type(type, data, size),
             srs_human_flv_video_frame_type2string(srs_utils_flv_video_frame_type(data, size)),
             sbytes);
     } else if (type == SRS_RTMP_TYPE_AUDIO) {

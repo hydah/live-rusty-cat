@@ -277,6 +277,7 @@ int proxy(srs_flv_t flv, srs_rtmp_t ortmp, int recur)
 
     int64_t base_time = srs_utils_time_ms();
     int64_t base = 0;
+    int64_t last_time = base;
     do {
         timestamp = 0;
         starttime = -1;
@@ -296,8 +297,17 @@ int proxy(srs_flv_t flv, srs_rtmp_t ortmp, int recur)
         srs_flv_lseek(flv, 0);
 
         recur--;
+        last_time = base + timestamp;
     } while(recur > 0 && ret == 0);
 
+    if ((ret = inject_h264_stream_eof_packet(ortmp, last_time)) != 0)
+    {
+        return ret;
+    }
+
+    if ((ret = srs_rtmp_fmle_unpublish_stream(ortmp)) != 0) {
+        return ret;
+    }
     return ret;
 }
 
