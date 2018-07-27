@@ -9935,6 +9935,7 @@ public:
 public:
     virtual int get_prefer_cid();
     virtual int get_message_type();
+    virtual int decode(SrsBuffer *stream);
 protected:
     virtual int get_size();
     virtual int encode_packet(SrsBuffer* stream);
@@ -10036,6 +10037,9 @@ public:
 protected:
     virtual int get_size();
     virtual int encode_packet(SrsBuffer* stream);
+// decode functions for concrete packet to override.
+public:
+    virtual int decode(SrsBuffer* stream);
 };
 
 /**
@@ -36363,6 +36367,37 @@ int SrsOnStatusCallPacket::encode_packet(SrsBuffer* stream)
     return ret;
 }
 
+int SrsOnStatusCallPacket::decode(SrsBuffer *stream)
+{
+    int ret = ERROR_SUCCESS;
+
+    if ((ret = srs_amf0_read_string(stream, command_name)) != ERROR_SUCCESS) {
+        srs_error("amf0 decode bwtc command_name failed. ret=%d", ret);
+        return ret;
+    }
+
+    if ((ret = srs_amf0_read_number(stream, transaction_id)) != ERROR_SUCCESS) {
+        srs_error("amf0 decode bwtc transaction_id failed. ret=%d", ret);
+        return ret;
+    }
+
+    if ((ret = srs_amf0_read_null(stream)) != ERROR_SUCCESS) {
+        srs_error("amf0 decode bwtc command_object failed. ret=%d", ret);
+        return ret;
+    }
+
+
+    if ((ret = data->read(stream)) != ERROR_SUCCESS) {
+        srs_error("amf0 decode bwtc command_object failed. ret=%d", ret);
+        return ret;
+    }
+
+    srs_info("decode SrsOnStatusCallPacket success.");
+
+    return ret;
+
+}
+
 SrsBandwidthPacket::SrsBandwidthPacket()
 {
     command_name = RTMP_AMF0_COMMAND_ON_STATUS;
@@ -36631,6 +36666,48 @@ int SrsOnStatusDataPacket::encode_packet(SrsBuffer* stream)
     srs_verbose("encode data success.");
 
     srs_info("encode onStatus(Data) packet success.");
+
+    return ret;
+}
+
+int SrsOnStatusDataPacket::decode(SrsBuffer* stream)
+{
+    int ret = ERROR_SUCCESS;
+
+    if ((ret = srs_amf0_read_string(stream, command_name)) != ERROR_SUCCESS) {
+        srs_error("decode metadata name failed. ret=%d", ret);
+        return ret;
+    }
+
+    srs_verbose("decode metadata name success. name=%s", name.c_str());
+
+    // the metadata maybe object or ecma array
+    SrsAmf0Any* any = NULL;
+    if ((ret = srs_amf0_read_any(stream, &any)) != ERROR_SUCCESS) {
+        srs_error("decode metadata metadata failed. ret=%d", ret);
+        return ret;
+    }
+
+    srs_assert(any);
+    if (any->is_object()) {
+        srs_freep(data);
+        data = any->to_object();
+        srs_info("decode metadata object success");
+        return ret;
+    }
+
+    SrsAutoFree(SrsAmf0Any, any);
+
+    if (any->is_ecma_array()) {
+        SrsAmf0EcmaArray* arr = any->to_ecma_array();
+
+        // if ecma array, copy to object.
+        for (int i = 0; i < arr->count(); i++) {
+            data->set(arr->key_at(i), arr->value_at(i)->copy());
+        }
+
+        srs_info("decode metadata array success");
+    }
 
     return ret;
 }
@@ -50080,6 +50157,16 @@ void srs_print_metadata(char *data, int size, stringstream &ss)
     packet.decode(&stream);
     srs_amf0_do_print(packet.metadata, ss, 1);
 }
+
+void srs_print_onstatus(char *data, int size, stringstream &ss)
+{
+    SrsOnStatusCallPacket packet;
+    SrsBuffer stream;
+    stream.initialize(data, size);
+    packet.decode(&stream);
+    srs_amf0_do_print(packet.data, ss, 1);
+}
+
 void srs_print_sei_profiling(char *data, int size, stringstream &ss, int64_t &e2e, int64_t &e2edge, int64_t &e2relay)
 {
     SrsJDProfilingSeiPacket packet;
@@ -50511,6 +50598,9 @@ int srs_human_format_rtmp_packet(char* buffer, int nb_buffer, char type, uint32_
                  srs_human_flv_audio_aac_packet_type2string(srs_utils_flv_audio_aac_packet_type(data, size)),
                  sbytes);
     } else if (type == SRS_RTMP_TYPE_SCRIPT) {
+        stringstream ss;
+        srs_print_onstatus(data, size, ss);
+        printf("onstatus is %s\n", ss.str().c_str());
         int nb = snprintf(buffer, nb_buffer, "Data packet type=%s, time=%d, size=%d, (%s)",
             srs_human_flv_tag_type2string(type), timestamp, size, sbytes);
         int nparsed = 0;
@@ -50528,7 +50618,30 @@ int srs_human_format_rtmp_packet(char* buffer, int nb_buffer, char type, uint32_
             srs_freepa(amf0_str);
         }
         buffer[nb] = 0;
-    } else {
+
+    } else if (type == 20){
+        stringstream ss;
+        srs_print_onstatus(data, size, ss);
+        printf("onstatus is %s\n", ss.str().c_str());
+        int nb = snprintf(buffer, nb_buffer, "Data packet type=%s, time=%d, size=%d, (%s)",
+            srs_human_flv_tag_type2string(type), timestamp, size, sbytes);
+        int nparsed = 0;
+        while (nparsed < size) {
+            int nb_parsed_this = 0;
+            srs_amf0_t amf0 = srs_amf0_parse(data + nparsed, size - nparsed, &nb_parsed_this);
+            if (amf0 == NULL) {
+                break;
+            }
+
+            nparsed += nb_parsed_this;
+
+            char* amf0_str = NULL;
+            nb += snprintf(buffer + nb, nb_buffer - nb, "\n%s", srs_human_amf0_print(amf0, &amf0_str, NULL)) - 1;
+            srs_freepa(amf0_str);
+        }
+        buffer[nb] = 0;
+
+    }else {
         snprintf(buffer, nb_buffer, "Rtmp packet type=%#x, dts=%d, pts=%d, size=%d, (%s)",
             type, timestamp, pts, size, sbytes);
     }
