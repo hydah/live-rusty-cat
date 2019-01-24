@@ -136,8 +136,11 @@ int main(int argc, char** argv)
     srs_human_trace("output: %s", url.c_str());
     srs_human_trace("recur: %d", recur);
 
+    ortmp = srs_rtmp_create(url.c_str());
+    // set 4s timeout
+    srs_rtmp_set_timeout(ortmp, 4000, 4000);
+
     if (!concat_txt.empty()) {
-        ortmp = srs_rtmp_create(url.c_str());
         int ret = 0;
         u_int32_t timestamp = 0;
         int32_t starttime = -1;
@@ -189,8 +192,6 @@ int main(int argc, char** argv)
             srs_human_trace("open flv file failed. ret=%d", ret);
             return ret;
         }
-
-        ortmp = srs_rtmp_create(url.c_str());
 
         ret = proxy(flv, ortmp, recur);
         srs_human_trace("ingest flv to RTMP completed");

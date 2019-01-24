@@ -9066,6 +9066,8 @@ public:
      */
     virtual int fmle_publish(std::string stream, int& stream_id);
     virtual int fmle_unpublish(std::string stream, int& stream_id);
+
+    virtual int print_connect_res_pkt(SrsConnectAppResPacket* pkt);
 public:
     /**
      * expect a specified message, drop others util got specified one.
@@ -33680,6 +33682,30 @@ int SrsRtmpClient::publish(string stream, int stream_id)
     return ret;
 }
 
+int SrsRtmpClient::print_connect_res_pkt(SrsConnectAppResPacket* pkt)
+{
+    if (pkt != NULL && pkt->info != NULL) {
+        string command_name = "";
+        string level = "";
+        string code = "";
+        string description = "";
+
+        command_name = pkt->command_name;
+        SrsAmf0Any* prop = NULL;
+        if ((prop = pkt->info->ensure_property_string("level")) != NULL) {
+            level = prop->to_str();
+        }
+        if ((prop = pkt->info->ensure_property_string("code")) != NULL) {
+            code = prop->to_str();
+        }
+        if ((prop = pkt->info->ensure_property_string("description")) != NULL) {
+            description=prop->to_str();
+        }
+        srs_human_trace("receive msg: command name=%s, level=%s, code=%s, description=%s.", command_name.c_str(), level.c_str(), code.c_str(), description.c_str());
+     }
+
+}
+
 int SrsRtmpClient::fmle_publish(string stream, int& stream_id)
 {
     stream_id = 0;
@@ -33720,6 +33746,27 @@ int SrsRtmpClient::fmle_publish(string stream, int& stream_id)
     // expect result of CreateStream
     if (true) {
         SrsCommonMessage* msg = NULL;
+        SrsPacket* pkt = NULL;
+        if ((ret = expect_message<SrsPacket>(&msg, &pkt)) != ERROR_SUCCESS) {
+            srs_error("expect create stream response message failed. ret=%d", ret);
+            return ret;
+        }
+        SrsAutoFree(SrsCommonMessage, msg);
+        SrsAutoFree(SrsPacket, pkt);
+        srs_info("get create stream response message");
+
+        if (dynamic_cast<SrsCreateStreamResPacket*>(pkt)) {
+            SrsCreateStreamResPacket* res = dynamic_cast<SrsCreateStreamResPacket*>(pkt);
+            stream_id = (int)res->stream_id;
+        }
+        if (dynamic_cast<SrsConnectAppResPacket*>(pkt)) {
+            SrsConnectAppResPacket* res = dynamic_cast<SrsConnectAppResPacket*>(pkt);
+            print_connect_res_pkt(res);
+        }
+    }
+    // expect result of CreateStream
+    /*if (true) {
+        SrsCommonMessage* msg = NULL;
         SrsCreateStreamResPacket* pkt = NULL;
         if ((ret = expect_message<SrsCreateStreamResPacket>(&msg, &pkt)) != ERROR_SUCCESS) {
             srs_error("expect create stream response message failed. ret=%d", ret);
@@ -33731,7 +33778,7 @@ int SrsRtmpClient::fmle_publish(string stream, int& stream_id)
 
         stream_id = (int)pkt->stream_id;
     }
-
+    */
     // publish(stream)
     if (true) {
         SrsPublishPacket* pkt = new SrsPublishPacket();
@@ -33741,6 +33788,17 @@ int SrsRtmpClient::fmle_publish(string stream, int& stream_id)
                 "stream=%s, stream_id=%d, ret=%d", stream.c_str(), stream_id, ret);
             return ret;
         }
+    }
+
+    // expect result of publish(stream) request
+    if (true) {
+        SrsCommonMessage* msg = NULL;
+        SrsConnectAppResPacket* pkt = NULL;
+        expect_message<SrsConnectAppResPacket>(&msg, &pkt);
+
+        SrsAutoFree(SrsCommonMessage, msg);
+        SrsAutoFree(SrsConnectAppResPacket, pkt);
+        print_connect_res_pkt(pkt);
     }
 
     return ret;
