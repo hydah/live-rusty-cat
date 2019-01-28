@@ -8995,6 +8995,45 @@ public:
     virtual int get_size();
     virtual int encode_packet(SrsBuffer* stream);
 };
+/**
+* response for SrsConnectAppPacket.
+*/
+class SrsConnectAppResPacket : public SrsPacket
+{
+public:
+    /**
+    * _result or _error; indicates whether the response is result or error.
+    */
+    std::string command_name;
+    /**
+    * Transaction ID is 1 for call connect responses
+    */
+    double transaction_id;
+    /**
+    * Name-value pairs that describe the properties(fmsver etc.) of the connection.
+    * @remark, never be NULL.
+    */
+    SrsAmf0Object* props;
+    /**
+    * Name-value pairs that describe the response from|the server. 'code',
+    * 'level', 'description' are names of few among such information.
+    * @remark, never be NULL.
+    */
+    SrsAmf0Object* info;
+public:
+    SrsConnectAppResPacket();
+    virtual ~SrsConnectAppResPacket();
+// decode functions for concrete packet to override.
+public:
+    virtual int decode(SrsBuffer* stream);
+// encode functions for concrete packet to override.
+public:
+    virtual int get_prefer_cid();
+    virtual int get_message_type();
+protected:
+    virtual int get_size();
+    virtual int encode_packet(SrsBuffer* stream);
+};
 
 /**
  * implements the client role protocol.
@@ -9347,45 +9386,6 @@ public:
 public:
     SrsConnectAppPacket();
     virtual ~SrsConnectAppPacket();
-// decode functions for concrete packet to override.
-public:
-    virtual int decode(SrsBuffer* stream);
-// encode functions for concrete packet to override.
-public:
-    virtual int get_prefer_cid();
-    virtual int get_message_type();
-protected:
-    virtual int get_size();
-    virtual int encode_packet(SrsBuffer* stream);
-};
-/**
-* response for SrsConnectAppPacket.
-*/
-class SrsConnectAppResPacket : public SrsPacket
-{
-public:
-    /**
-    * _result or _error; indicates whether the response is result or error.
-    */
-    std::string command_name;
-    /**
-    * Transaction ID is 1 for call connect responses
-    */
-    double transaction_id;
-    /**
-    * Name-value pairs that describe the properties(fmsver etc.) of the connection.
-    * @remark, never be NULL.
-    */
-    SrsAmf0Object* props;
-    /**
-    * Name-value pairs that describe the response from|the server. 'code',
-    * 'level', 'description' are names of few among such information.
-    * @remark, never be NULL.
-    */
-    SrsAmf0Object* info;
-public:
-    SrsConnectAppResPacket();
-    virtual ~SrsConnectAppResPacket();
 // decode functions for concrete packet to override.
 public:
     virtual int decode(SrsBuffer* stream);
