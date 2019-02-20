@@ -9034,6 +9034,44 @@ protected:
     virtual int get_size();
     virtual int encode_packet(SrsBuffer* stream);
 };
+/**
+* onStatus command, AMF0 Call
+* @remark, user must set the stream_id by SrsCommonMessage.set_packet().
+*/
+class SrsOnStatusCallPacket : public SrsPacket
+{
+public:
+    /**
+    * Name of command. Set to "onStatus"
+    */
+    std::string command_name;
+    /**
+    * Transaction ID set to 0.
+    */
+    double transaction_id;
+    /**
+    * Command information does not exist. Set to null type.
+    * @remark, never be NULL, an AMF0 null instance.
+    */
+    SrsAmf0Any* args; // null
+    /**
+    * Name-value pairs that describe the response from the server.
+    * 'code','level', 'description' are names of few among such information.
+    * @remark, never be NULL, an AMF0 object instance.
+    */
+    SrsAmf0Object* data;
+public:
+    SrsOnStatusCallPacket();
+    virtual ~SrsOnStatusCallPacket();
+// encode functions for concrete packet to override.
+public:
+    virtual int get_prefer_cid();
+    virtual int get_message_type();
+    virtual int decode(SrsBuffer *stream);
+protected:
+    virtual int get_size();
+    virtual int encode_packet(SrsBuffer* stream);
+};
 
 /**
  * implements the client role protocol.
@@ -9106,7 +9144,7 @@ public:
     virtual int fmle_publish(std::string stream, int& stream_id);
     virtual int fmle_unpublish(std::string stream, int& stream_id);
 
-    virtual int print_connect_res_pkt(SrsConnectAppResPacket* pkt);
+    virtual int print_connect_res_pkt(SrsOnStatusCallPacket* pkt);
 public:
     /**
      * expect a specified message, drop others util got specified one.
@@ -9904,44 +9942,7 @@ protected:
     virtual int encode_packet(SrsBuffer* stream);
 };
 
-/**
-* onStatus command, AMF0 Call
-* @remark, user must set the stream_id by SrsCommonMessage.set_packet().
-*/
-class SrsOnStatusCallPacket : public SrsPacket
-{
-public:
-    /**
-    * Name of command. Set to "onStatus"
-    */
-    std::string command_name;
-    /**
-    * Transaction ID set to 0.
-    */
-    double transaction_id;
-    /**
-    * Command information does not exist. Set to null type.
-    * @remark, never be NULL, an AMF0 null instance.
-    */
-    SrsAmf0Any* args; // null
-    /**
-    * Name-value pairs that describe the response from the server.
-    * 'code','level', 'description' are names of few among such information.
-    * @remark, never be NULL, an AMF0 object instance.
-    */
-    SrsAmf0Object* data;
-public:
-    SrsOnStatusCallPacket();
-    virtual ~SrsOnStatusCallPacket();
-// encode functions for concrete packet to override.
-public:
-    virtual int get_prefer_cid();
-    virtual int get_message_type();
-    virtual int decode(SrsBuffer *stream);
-protected:
-    virtual int get_size();
-    virtual int encode_packet(SrsBuffer* stream);
-};
+
 
 /**
 * the special packet for the bandwidth test.
@@ -31971,6 +31972,16 @@ int SrsProtocol::do_decode_message(SrsMessageHeader& header, SrsBuffer* stream, 
             srs_info("decode the AMF0/AMF3 closeStream message.");
             *ppacket = packet = new SrsCloseStreamPacket();
             return packet->decode(stream);
+        } else if (command == RTMP_AMF0_COMMAND_ON_STATUS) {
+            if (header.is_amf0_command() || header.is_amf3_command()) {
+                srs_info("decode the AMF0/AMF3 call message.");
+                *ppacket = packet = new SrsOnStatusCallPacket();
+                return packet->decode(stream);
+            } else if (header.is_amf0_data() || header.is_amf3_data()) {
+                srs_info("decode the AMF0/AMF3 data message.");
+                *ppacket = packet = new SrsOnStatusDataPacket();
+                return packet->decode(stream);
+            }
         } else if (header.is_amf0_command() || header.is_amf3_command()) {
             srs_info("decode the AMF0/AMF3 call message.");
             *ppacket = packet = new SrsCallPacket();
@@ -33682,9 +33693,9 @@ int SrsRtmpClient::publish(string stream, int stream_id)
     return ret;
 }
 
-int SrsRtmpClient::print_connect_res_pkt(SrsConnectAppResPacket* pkt)
+int SrsRtmpClient::print_connect_res_pkt(SrsOnStatusCallPacket* pkt)
 {
-    if (pkt != NULL && pkt->info != NULL) {
+    if (pkt != NULL && pkt->data != NULL) {
         string command_name = "";
         string level = "";
         string code = "";
@@ -33692,13 +33703,13 @@ int SrsRtmpClient::print_connect_res_pkt(SrsConnectAppResPacket* pkt)
 
         command_name = pkt->command_name;
         SrsAmf0Any* prop = NULL;
-        if ((prop = pkt->info->ensure_property_string("level")) != NULL) {
+        if ((prop = pkt->data->ensure_property_string("level")) != NULL) {
             level = prop->to_str();
         }
-        if ((prop = pkt->info->ensure_property_string("code")) != NULL) {
+        if ((prop = pkt->data->ensure_property_string("code")) != NULL) {
             code = prop->to_str();
         }
-        if ((prop = pkt->info->ensure_property_string("description")) != NULL) {
+        if ((prop = pkt->data->ensure_property_string("description")) != NULL) {
             description=prop->to_str();
         }
         srs_human_trace("receive msg: command name=%s, level=%s, code=%s, description=%s.", command_name.c_str(), level.c_str(), code.c_str(), description.c_str());
@@ -33759,8 +33770,8 @@ int SrsRtmpClient::fmle_publish(string stream, int& stream_id)
             SrsCreateStreamResPacket* res = dynamic_cast<SrsCreateStreamResPacket*>(pkt);
             stream_id = (int)res->stream_id;
         }
-        if (dynamic_cast<SrsConnectAppResPacket*>(pkt)) {
-            SrsConnectAppResPacket* res = dynamic_cast<SrsConnectAppResPacket*>(pkt);
+        if (dynamic_cast<SrsOnStatusCallPacket*>(pkt)) {
+            SrsOnStatusCallPacket* res = dynamic_cast<SrsOnStatusCallPacket*>(pkt);
             print_connect_res_pkt(res);
         }
     }
@@ -33791,14 +33802,19 @@ int SrsRtmpClient::fmle_publish(string stream, int& stream_id)
     }
 
     // expect result of publish(stream) request
-    if (true) {
+    while (true) {
         SrsCommonMessage* msg = NULL;
-        SrsConnectAppResPacket* pkt = NULL;
-        expect_message<SrsConnectAppResPacket>(&msg, &pkt);
+        SrsOnStatusCallPacket* pkt = NULL;
+        if ((ret = expect_message<SrsOnStatusCallPacket>(&msg, &pkt)) != ERROR_SUCCESS) {
+            srs_error("expect SrsOnStatusCallPacket failed. ret=%d", ret);
+            break;
+        }
 
         SrsAutoFree(SrsCommonMessage, msg);
-        SrsAutoFree(SrsConnectAppResPacket, pkt);
-        print_connect_res_pkt(pkt);
+        SrsAutoFree(SrsOnStatusCallPacket, pkt);
+        if (pkt != NULL) {
+            print_connect_res_pkt(pkt);
+        }
     }
 
     return ret;
