@@ -33807,7 +33807,8 @@ int SrsRtmpClient::fmle_publish(string stream, int& stream_id)
         SrsOnStatusCallPacket* pkt = NULL;
         if ((ret = expect_message<SrsOnStatusCallPacket>(&msg, &pkt)) != ERROR_SUCCESS) {
             srs_error("expect SrsOnStatusCallPacket failed. ret=%d", ret);
-            break;
+            ret = ERROR_SUCCESS;
+            return ret;
         }
 
         SrsAutoFree(SrsCommonMessage, msg);
