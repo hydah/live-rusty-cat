@@ -33806,7 +33806,6 @@ int SrsRtmpClient::fmle_publish(string stream, int& stream_id)
         SrsCommonMessage* msg = NULL;
         SrsOnStatusCallPacket* pkt = NULL;
         if ((ret = expect_message<SrsOnStatusCallPacket>(&msg, &pkt)) != ERROR_SUCCESS) {
-            srs_error("expect SrsOnStatusCallPacket failed. ret=%d", ret);
             ret = ERROR_SUCCESS;
             return ret;
         }
@@ -33815,6 +33814,10 @@ int SrsRtmpClient::fmle_publish(string stream, int& stream_id)
         SrsAutoFree(SrsOnStatusCallPacket, pkt);
         if (pkt != NULL) {
             print_connect_res_pkt(pkt);
+            SrsAmf0Any* prop =  pkt->data->ensure_property_string("code");
+            if ((prop != NULL) && (prop->to_str() != "NetStream.Publish.Start")) {
+                 return -1;
+            }
         }
     }
 
