@@ -33690,6 +33690,8 @@ int SrsRtmpClient::publish(string stream, int stream_id)
         }
     }
 
+
+
     return ret;
 }
 
@@ -50658,7 +50660,7 @@ int srs_human_format_rtmp_packet(char* buffer, int nb_buffer, char type, uint32_
     }
 
     if (type == SRS_RTMP_TYPE_VIDEO) {
-        snprintf(buffer, nb_buffer, "Video packet type=%s, dts=%d, pts=%d, size=%d, %s(%s:%d,%s), (%s)",
+        snprintf(buffer, nb_buffer, "Video packet type=%s, dts=%u, pts=%u, size=%d, %s(%s:%d,%s), (%s)",
             srs_human_flv_tag_type2string(type), timestamp, pts, size,
             srs_human_flv_video_codec_id2string(srs_utils_flv_video_codec_id(data, size)),
             srs_human_flv_video_avc_packet_type2string(srs_utils_flv_video_avc_packet_type(data, size)),
@@ -50667,7 +50669,7 @@ int srs_human_format_rtmp_packet(char* buffer, int nb_buffer, char type, uint32_
             srs_human_flv_video_frame_type2string(srs_utils_flv_video_frame_type(data, size)),
             sbytes);
     } else if (type == SRS_RTMP_TYPE_AUDIO) {
-        snprintf(buffer, nb_buffer, "Audio packet type=%s, dts=%d, pts=%d, size=%d, %s(%s,%s,%s,%s), (%s)",
+        snprintf(buffer, nb_buffer, "Audio packet type=%s, dts=%u, pts=%u, size=%d, %s(%s,%s,%s,%s), (%s)",
                  srs_human_flv_tag_type2string(type), timestamp, pts, size,
                  srs_human_flv_audio_sound_format2string(srs_utils_flv_audio_sound_format(data, size)),
                  srs_human_flv_audio_sound_rate2string(srs_utils_flv_audio_sound_rate(data, size)),
@@ -50720,7 +50722,7 @@ int srs_human_format_rtmp_packet(char* buffer, int nb_buffer, char type, uint32_
         buffer[nb] = 0;
 
     }else {
-        snprintf(buffer, nb_buffer, "Rtmp packet type=%#x, dts=%d, pts=%d, size=%d, (%s)",
+        snprintf(buffer, nb_buffer, "Rtmp packet type=%#x, dts=%u, pts=%u, size=%d, (%s)",
             type, timestamp, pts, size, sbytes);
     }
 
