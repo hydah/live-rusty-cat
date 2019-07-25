@@ -50,11 +50,13 @@ struct Config {
     bool debug;
     bool complex_hs;
     bool fast_hs;
+    int  dis_thr;
     Config() {
         total_time = 10000;
         show_json = only_sum = debug = false;
         complex_hs = false;
         fast_hs = false;
+        dis_thr = 100;
     };
     void parse(int argc, const char **argv) {
         parser.parse(argc, argv);
@@ -66,12 +68,19 @@ struct Config {
         if (parser.valid("t")) {
             total_time = parser.get<int>("t");
         }
+        
+        if (parser.valid("D")) {
+            dis_thr = parser.get<int>("D");
+        }
+
         if (parser.valid("H")) {
             string hs_type = parser.retrieve<string>("H");
             if (hs_type == "complex") {
                 complex_hs = true;
             }
         }
+        log(INFO, "total_time %d, show_json %d, only_sum %d, debug %d, complex_hs %d, fast_hs %d, dis_thr %d",
+               total_time, show_json, only_sum, debug, complex_hs, fast_hs, dis_thr);
     }
 } config;
 bool stop_playing = false;
@@ -175,11 +184,11 @@ void do_rtmp(LiveRes &live_res)
             frame_count++;
             int64_t tmp_time = srs_utils_time_ms();
             int _wt = int(tmp_time - last_time) - int(timestamp - last_ts);
-            if (is_firstI && _wt > 100) {
+            if (is_firstI && _wt > config.dis_thr) {
                 live_res.waittime += _wt;
+                live_res.waitcnt ++;
                 last_time = tmp_time;
                 last_ts = timestamp;
-                live_res.waitcnt ++;
             }
             if(is_firstI == false && frame_type == SrsVideoAvcFrameTypeKeyFrame){
                 live_res.first_frame_time = now_time - start_time;
@@ -214,8 +223,9 @@ void do_rtmp(LiveRes &live_res)
 rtmp_destroy:
     int64_t tmp_time = srs_utils_time_ms();
     int _wt = int(tmp_time - last_time) - int(timestamp - last_ts);
-    if (is_firstI && _wt > 0) {
+    if (is_firstI && _wt > config.dis_thr) {
         live_res.waittime += _wt;
+        live_res.waitcnt ++;
         last_time = tmp_time;
         last_ts = timestamp;
     }
@@ -355,6 +365,7 @@ int main(int argc, const char** argv)
     config.parser.addArgument("-s", "--only_summary", 0, true, "only print summary");
     config.parser.addArgument("-j", "--json", 0, true, "\tprint summary with json fomat");
     config.parser.addArgument("-F", "--fast_hs", 0, true, "\tuse fast handshake");
+    config.parser.addArgument("-D", "--dis_thr", 1, true, "\tthe discontinuous threshold");
     config.parser.addArgument("-H", "--handshake", 1, true, "handshake type, will use complex handshake only if specified 'complex'");
     config.parser.addFinalArgument("null", 0);
     config.parse(argc, argv);
