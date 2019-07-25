@@ -25,6 +25,7 @@ struct LiveRes{
     int total_time;
     int runtime;
     int waittime;
+    int waitcunt;
     int sei_count;
     int dns_resolve_time;
     int connect_server_time;
@@ -34,7 +35,7 @@ struct LiveRes{
     LiveRes() {
         addr = "";
         e2e = e2relay = e2edge = 0;
-        runtime = total_time = waittime = 0;
+        runtime = total_time = waittime = waitcunt = 0;
         handshake_time = connection_time = first_frame_time = 0;
         sei_count = 0;
     };
@@ -174,10 +175,11 @@ void do_rtmp(LiveRes &live_res)
             frame_count++;
             int64_t tmp_time = srs_utils_time_ms();
             int _wt = int(tmp_time - last_time) - int(timestamp - last_ts);
-            if (is_firstI && _wt > 0) {
+            if (is_firstI && _wt > 100) {
                 live_res.waittime += _wt;
                 last_time = tmp_time;
                 last_ts = timestamp;
+                live_res.waitcunt ++;
             }
             if(is_firstI == false && frame_type == SrsVideoAvcFrameTypeKeyFrame){
                 live_res.first_frame_time = now_time - start_time;
@@ -326,6 +328,7 @@ void print_result(LiveRes &live_res, bool print_json) {
              << SRS_JFIELD_ORG("connection_time", live_res.connection_time) << SRS_JFIELD_CONT
              << SRS_JFIELD_ORG("first_itime", live_res.first_frame_time) << SRS_JFIELD_CONT
              << SRS_JFIELD_ORG("waiting_time", live_res.waittime) << SRS_JFIELD_CONT
+             << SRS_JFIELD_ORG("waiting_time", live_res.waitcnt) << SRS_JFIELD_CONT
              << SRS_JFIELD_ORG("sei_frame_count", live_res.sei_count) << SRS_JFIELD_CONT
              << SRS_JFIELD_ORG("e2e", avg_e2e) << SRS_JFIELD_CONT
              << SRS_JFIELD_ORG("e2relay", avg_e2relay) << SRS_JFIELD_CONT
@@ -335,10 +338,10 @@ void print_result(LiveRes &live_res, bool print_json) {
 
     } else {
         printf("address %s, total_time %d, run_time %d, dns_resolve_time %d, connect_server_time %d, handshake_time %d, "
-               "connection_time %d, first_itime %d, waiting_time %d, sei_frame_count %d",
+               "connection_time %d, first_itime %d, waiting_time %d, waiting_count %d, sei_frame_count %d",
                live_res.addr.c_str(), live_res.total_time, live_res.runtime, live_res.dns_resolve_time,
                live_res.connect_server_time, live_res.handshake_time, live_res.connection_time, live_res.first_frame_time,
-               live_res.waittime, live_res.sei_count);
+               live_res.waittime, live_res.waitcnt, live_res.sei_count);
         printf(", e2e %d, e2relay %d, e2edge %d", avg_e2e, avg_e2relay, avg_e2edge);
         printf("\n");
     }
