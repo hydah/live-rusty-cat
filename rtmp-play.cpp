@@ -197,10 +197,6 @@ void do_rtmp(LiveRes &live_res)
                 last_ts = timestamp;
             }
 
-            if (_wt < 0) { //fix bug. when got video too fast(video cache, or timestamp error),  the last_ts very samll, then _wt < 0, and last_ts always small.
-                last_ts = timestamp;
-            }
-
             if(has_firstI == false && frame_type == SrsVideoAvcFrameTypeKeyFrame){
                 live_res.first_frame_time = now_time - start_time;
                 log(DEBUG, "play stream start and the first I frame arrive at %ld ms.", live_res.first_frame_time);
