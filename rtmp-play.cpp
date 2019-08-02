@@ -22,21 +22,28 @@ struct LiveRes{
     int64_t e2e;
     int64_t e2relay;
     int64_t e2edge;
+
     int total_time;
     int runtime;
     int waittime;
-    int sei_count;
+    int waitcnt;
+
     int dns_resolve_time;
     int connect_server_time;
+
     int handshake_time;
     int connection_time;
     int first_frame_time;
+
+    int frame_count;
+    int sei_count;
+
     LiveRes() {
         addr = "";
         e2e = e2relay = e2edge = 0;
-        runtime = total_time = waittime = 0;
-        handshake_time = connection_time = first_frame_time = 0;
-        sei_count = 0;
+        total_time = runtime = waittime = waitcnt = 0;
+        handshake_time = connection_time = first_frame_time = -1;
+        frame_count = sei_count = 0;
     };
 };
 
@@ -49,11 +56,13 @@ struct Config {
     bool debug;
     bool complex_hs;
     bool fast_hs;
+    int  dis_thr;
     Config() {
         total_time = 10000;
         show_json = only_sum = debug = false;
         complex_hs = false;
         fast_hs = false;
+        dis_thr = 100;
     };
     void parse(int argc, const char **argv) {
         parser.parse(argc, argv);
@@ -65,12 +74,19 @@ struct Config {
         if (parser.valid("t")) {
             total_time = parser.get<int>("t");
         }
+        
+        if (parser.valid("D")) {
+            dis_thr = parser.get<int>("D");
+        }
+
         if (parser.valid("H")) {
             string hs_type = parser.retrieve<string>("H");
             if (hs_type == "complex") {
                 complex_hs = true;
             }
         }
+        log(INFO, "total_time %d, show_json %d, only_sum %d, debug %d, complex_hs %d, fast_hs %d, dis_thr %d",
+               total_time, show_json, only_sum, debug, complex_hs, fast_hs, dis_thr);
     }
 } config;
 bool stop_playing = false;
@@ -86,8 +102,7 @@ void sig_handler(int sig)
 void do_rtmp(LiveRes &live_res)
 {
     int64_t start_time, last_time;
-    int frame_count = 0;
-    bool is_firstI = false;
+    bool has_firstI = false;
     int64_t now_time, interval;
     uint32_t last_ts = 0, timestamp = 0;;
     srs_rtmp_t rtmp = NULL;
@@ -171,18 +186,21 @@ void do_rtmp(LiveRes &live_res)
         now_time = srs_utils_time_ms();
         if((avc_packet_type == SrsVideoAvcFrameTraitNALU)
             && (frame_type == SrsVideoAvcFrameTypeKeyFrame || frame_type == SrsVideoAvcFrameTypeInterFrame)){
-            frame_count++;
+            live_res.frame_count++;
             int64_t tmp_time = srs_utils_time_ms();
             int _wt = int(tmp_time - last_time) - int(timestamp - last_ts);
-            if (is_firstI && _wt > 0) {
+            //printf("frame_count %d, _wt %d, tmp_time %d, last_time %d, timestamp %d, last_ts %d\n", live_res.frame_count, _wt, tmp_time, last_time, timestamp, last_ts);
+            if (has_firstI && _wt > config.dis_thr) {
                 live_res.waittime += _wt;
+                live_res.waitcnt ++;
                 last_time = tmp_time;
                 last_ts = timestamp;
             }
-            if(is_firstI == false && frame_type == SrsVideoAvcFrameTypeKeyFrame){
+
+            if(has_firstI == false && frame_type == SrsVideoAvcFrameTypeKeyFrame){
                 live_res.first_frame_time = now_time - start_time;
                 log(DEBUG, "play stream start and the first I frame arrive at %ld ms.", live_res.first_frame_time);
-                is_firstI = true;
+                has_firstI = true;
                 last_time = tmp_time;
                 last_ts = timestamp;
             }
@@ -212,8 +230,9 @@ void do_rtmp(LiveRes &live_res)
 rtmp_destroy:
     int64_t tmp_time = srs_utils_time_ms();
     int _wt = int(tmp_time - last_time) - int(timestamp - last_ts);
-    if (is_firstI && _wt > 0) {
+    if (has_firstI && _wt > config.dis_thr) {
         live_res.waittime += _wt;
+        live_res.waitcnt ++;
         last_time = tmp_time;
         last_ts = timestamp;
     }
@@ -326,6 +345,8 @@ void print_result(LiveRes &live_res, bool print_json) {
              << SRS_JFIELD_ORG("connection_time", live_res.connection_time) << SRS_JFIELD_CONT
              << SRS_JFIELD_ORG("first_itime", live_res.first_frame_time) << SRS_JFIELD_CONT
              << SRS_JFIELD_ORG("waiting_time", live_res.waittime) << SRS_JFIELD_CONT
+             << SRS_JFIELD_ORG("waiting_count", live_res.waitcnt) << SRS_JFIELD_CONT
+             << SRS_JFIELD_ORG("total_frame_count", live_res.frame_count) << SRS_JFIELD_CONT
              << SRS_JFIELD_ORG("sei_frame_count", live_res.sei_count) << SRS_JFIELD_CONT
              << SRS_JFIELD_ORG("e2e", avg_e2e) << SRS_JFIELD_CONT
              << SRS_JFIELD_ORG("e2relay", avg_e2relay) << SRS_JFIELD_CONT
@@ -335,10 +356,10 @@ void print_result(LiveRes &live_res, bool print_json) {
 
     } else {
         printf("address %s, total_time %d, run_time %d, dns_resolve_time %d, connect_server_time %d, handshake_time %d, "
-               "connection_time %d, first_itime %d, waiting_time %d, sei_frame_count %d",
+               "connection_time %d, first_itime %d, waiting_time %d, waiting_count %d, total_frame_count %d, sei_frame_count %d",
                live_res.addr.c_str(), live_res.total_time, live_res.runtime, live_res.dns_resolve_time,
                live_res.connect_server_time, live_res.handshake_time, live_res.connection_time, live_res.first_frame_time,
-               live_res.waittime, live_res.sei_count);
+               live_res.waittime, live_res.waitcnt, live_res.frame_count, live_res.sei_count);
         printf(", e2e %d, e2relay %d, e2edge %d", avg_e2e, avg_e2relay, avg_e2edge);
         printf("\n");
     }
@@ -352,6 +373,7 @@ int main(int argc, const char** argv)
     config.parser.addArgument("-s", "--only_summary", 0, true, "only print summary");
     config.parser.addArgument("-j", "--json", 0, true, "\tprint summary with json fomat");
     config.parser.addArgument("-F", "--fast_hs", 0, true, "\tuse fast handshake");
+    config.parser.addArgument("-D", "--dis_thr", 1, true, "\tthe discontinuous threshold");
     config.parser.addArgument("-H", "--handshake", 1, true, "handshake type, will use complex handshake only if specified 'complex'");
     config.parser.addFinalArgument("null", 0);
     config.parse(argc, argv);
