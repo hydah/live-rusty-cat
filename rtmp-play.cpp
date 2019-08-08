@@ -85,8 +85,6 @@ struct Config {
                 complex_hs = true;
             }
         }
-        log(INFO, "total_time %d, show_json %d, only_sum %d, debug %d, complex_hs %d, fast_hs %d, dis_thr %d",
-               total_time, show_json, only_sum, debug, complex_hs, fast_hs, dis_thr);
     }
 } config;
 bool stop_playing = false;
@@ -387,6 +385,8 @@ int main(int argc, const char** argv)
         init_loglevel(DEBUG);
     }
 
+    log(INFO, "total_time %d, show_json %d, only_sum %d, debug %d, complex_hs %d, fast_hs %d, dis_thr %d",
+        config.total_time, config.show_json, config.only_sum, config.debug, config.complex_hs, config.fast_hs, config.dis_thr);
     log(INFO, "suck rtmp stream like rtmpdump");
     log(INFO, "srs(simple-rtmp-server) client librtmp library.");
     log(INFO, "version: %d.%d.%d", srs_version_major(), srs_version_minor(), srs_version_revision());
