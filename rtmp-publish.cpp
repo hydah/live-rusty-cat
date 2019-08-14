@@ -65,7 +65,8 @@ void print_header()
 void print_usage(char *name)
 {
     if (name == NULL) {
-        name = "null";
+        char b[] = "null";
+        name = b;
     }
     printf("ingest flv file and publish to RTMP server\n"
            "Usage: %s <-i in_flv_file>|<-f input_file_list> <-y out_rtmp_url> <-r>\n"

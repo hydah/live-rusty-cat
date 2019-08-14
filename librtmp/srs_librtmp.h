@@ -1285,5 +1285,15 @@ extern int srs_human_print_rtmp_packet4(char type, uint32_t timestamp, char* dat
 }
 #endif
 
+
+
+extern void srs_hdl_destroy(void* io);
+extern void* srs_hdl_create();
+extern int srs_hdl_connect(void* io, std::string server, int port);
+extern int srs_hdl_publish(void* io, std::string url);
+extern int srs_hdl_write_header(void* io, char flv_header[9]);
+extern int srs_hdl_write_tag(void* io, char type, int32_t time, char* data, int size);
+extern std::string srs_dns_resolve(std::string host);
+
 #endif
 
