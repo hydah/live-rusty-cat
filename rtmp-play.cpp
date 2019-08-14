@@ -246,7 +246,7 @@ void do_file(LiveRes &live_res)
     bool is_firstI = false;
     int ret;
     int64_t now_time, interval;
-    uint32_t last_ts = 0, timestamp = 0;;
+    uint32_t last_ts = 0, timestamp = 0;
     srs_rtmp_t rtmp = NULL;
 
     start_time = srs_utils_time_ms();

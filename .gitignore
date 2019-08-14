@@ -6,4 +6,4 @@ logs/*
 *.flv
 cscope*
 tags
-
+*.tgz
