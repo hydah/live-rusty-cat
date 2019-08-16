@@ -8,9 +8,10 @@
 #include <sys/stat.h>
 #include <fcntl.h>
 #include <string>
-#include "srs_librtmp.h"
-#include "rtmp-tool.h"
-#include "argparse.hpp"
+
+#include "cli/argparse.hpp"
+#include "lib-livestream.hpp"
+
 using namespace std;
 
 int proxy(srs_flv_t flv, srs_rtmp_t ortmp, int recur);
