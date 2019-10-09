@@ -9,7 +9,7 @@
 #include <fcntl.h>
 #include <string>
 
-#include "cli/argparse.hpp"
+#include "argparse.hpp"
 #include "lib-livestream.hpp"
 
 using namespace std;
@@ -33,15 +33,17 @@ struct Config {
         input_file = parser.retrieve<string>("i");
         addr = parser.retrieve<string>("y");
         concat_file = parser.retrieve<string>("f");
-        recur_times = parser.retrieve<int>("r");
+        if (parser.valid("r")) {
+            recur_times = parser.get<int>("r");
+        }
     }
 } config;
 
 void init(int argc, const char** argv) {
     config.parser.addArgument("-i", "--input_file", 1, false, "\trtmp play url. like rtmp://127.0.0.1:1935/live/livestream");
-    config.parser.addArgument("-y", "--tcURL", 1, true, "\tthe duration that this program will run, 10s if not specified");
-    config.parser.addArgument("-f", "--concat_file", 1, false, "print all the debug info");
-    config.parser.addArgument("-r", "--recur_times", 1, false, "only print summary");
+    config.parser.addArgument("-y", "--tcURL", 1, false, "\tthe duration that this program will run, 10s if not specified");
+    config.parser.addArgument("-f", "--concat_file", 1, true, "print all the debug info");
+    config.parser.addArgument("-r", "--recur_times", 1, true, "only print summary");
     config.parser.addFinalArgument("null", 0);
     config.parse(argc, argv);
     tools_main_entrance_startup_time = srs_utils_time_ms();

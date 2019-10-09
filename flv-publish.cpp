@@ -34,26 +34,13 @@ gcc srs_ingest_flv.c ../../objs/lib/srs_librtmp.a -g -O0 -lstdc++ -o srs_ingest_
 #include <netinet/in.h>
 #include <fcntl.h>
 #include <string>
-#include "librtmp/srs_librtmp.h"
-
+#include "lib-livestream.hpp"
 
 using namespace std;
 
-
-
 int proxy(srs_flv_t flv, void* client, int recur);
 int do_proxy(srs_flv_t flv, void* client, int64_t base, int64_t re, int32_t* pstarttime, u_int32_t* ptimestamp);
-
-int connect_oc(srs_rtmp_t ortmp);
-
-#define RE_PULSE_MS 300
-#define RE_PULSE_JITTER_MS 3000
-int64_t re_create();
-void re_update(int64_t re, int32_t starttime, u_int32_t time);
-void re_cleanup(int64_t re, int32_t starttime, u_int32_t time);
-
 int64_t tools_main_entrance_startup_time;
-
 static const char *optString = "i:y:f:r:";
 
 void print_header()
@@ -139,33 +126,52 @@ int conect_server(string server, int port, int64_t timeout)
     //srs_socket_connect(server, port, timeout, &stfd, do_bind, is_https)
     return stfd;
 }*/
-int  parse_url(string tc_url, string& server, int& port)
+int  parse_url(string tc_url, string& server, int& port, string &url)
 {
     int ret = 0;
     port = 80;
-    size_t pos = tc_url.find("http");
-    if (pos == string::npos) {
-        srs_human_trace("output url should only be http start.");
-        ret = -1;
-        return ret;
+    SrsHttpUri* _uri = new SrsHttpUri();
+    SrsAutoFree(SrsHttpUri, _uri);
+    _uri->initialize(tc_url);
+
+    server = _uri->get_host();
+    port = _uri->get_port();
+
+
+    string query_str = _uri->get_query();
+    string host_str;
+    query_str = srs_string_replace(query_str, ",", "?");
+    query_str = srs_string_replace(query_str, "...", "?");
+    query_str = srs_string_replace(query_str, "&&", "?");
+    query_str = srs_string_replace(query_str, "=", "?");
+    size_t pos = 0;
+    if ((pos = query_str.find("vhost?")) != std::string::npos) {
+        query_str = query_str.substr(pos + 6);
+        if (!query_str.empty()) {
+            host_str = query_str;
+        }
+        if ((pos = host_str.find("?")) != std::string::npos) {
+            host_str = host_str.substr(0, pos);
+        }
+        if ((pos = host_str.find("&")) != std::string::npos) {
+            host_str = host_str.substr(0, pos);
+        }
+    } else if ((pos = query_str.find("domain?")) != std::string::npos) {
+        // support bytedance
+        query_str = query_str.substr(pos + 7);
+        if (!query_str.empty()) {
+            host_str = query_str;
+        }
+        if ((pos = host_str.find("?")) != std::string::npos) {
+            host_str = host_str.substr(0, pos);
+        }
+        if ((pos = host_str.find("&")) != std::string::npos) {
+            host_str = host_str.substr(0, pos);
+        }
     }
-    pos = tc_url.find("://");
-    if (pos != string::npos) {
-        tc_url = tc_url.substr(pos+3);
-        pos = tc_url.find("/");
-        if (pos != string::npos) {
-            tc_url = tc_url.substr(0, pos);
-            server = tc_url;
-            pos = tc_url.find(":");
-            if (pos != string::npos) {
-                server = tc_url.substr(0, pos);
-                string ps = tc_url.substr(pos+1);
-                port = atoi(ps.c_str());
-            }
-            return ret;
-        } 
-    }
-    ret = -1;
+
+    url = _uri->get_schema() + string("://") + host_str+_uri->get_path() + "?" +_uri->get_query();
+    log(INFO, "url is %s", url.c_str());
     return ret;
 }
 /*
@@ -223,6 +229,7 @@ int main(int argc, char** argv)
     string input_file, url, concat_txt, server = "";
     int port = 80;
     int recur;
+    string hurl;
 
     tools_main_entrance_startup_time = srs_utils_time_ms();
     parse_flag(argc, argv, input_file, concat_txt, url, recur);
@@ -234,7 +241,7 @@ int main(int argc, char** argv)
         srs_human_trace("output invalid, use -y <output>");
         return -1;
     }
-    ret = parse_url(url, server, port);
+    ret = parse_url(url, server, port, hurl);
     if (ret != 0) {
         srs_human_trace("parse url: %s error.", url.c_str());
         return ret;
@@ -244,7 +251,7 @@ int main(int argc, char** argv)
     } else {
         srs_human_trace("input:  %s", input_file.c_str());
     }
-    srs_human_trace("output: %s", url.c_str());
+    srs_human_trace("output: %s", hurl.c_str());
     srs_human_trace("recur: %d", recur);
     void* client = srs_hdl_create();
     string ip = srs_dns_resolve(server);
@@ -254,7 +261,7 @@ int main(int argc, char** argv)
         srs_hdl_destroy(client);
         return ret;
     }
-    ret = srs_hdl_publish(client, url);
+    ret = srs_hdl_publish(client, hurl);
     if (ret != 0) {
         srs_human_trace("client publish error, ret = %d.", ret);
         srs_hdl_destroy(client);
@@ -294,7 +301,7 @@ int main(int argc, char** argv)
                     srs_flv_close(flv);
                     break;
                 }
-                int64_t re = re_create();
+                int64_t re = re_create(tools_main_entrance_startup_time);
                 ret = do_proxy(flv, client, base, re, &starttime, &timestamp);
                 if (ret != 0) {
                     srs_human_trace("do proxy failed. ret = %d.", ret);
@@ -413,7 +420,7 @@ int proxy(srs_flv_t flv, void* client, int recur)
             break;
         }
 
-        int64_t re = re_create();
+        int64_t re = re_create(tools_main_entrance_startup_time);
 
         ret = do_proxy(flv, client, base, re, &starttime, &timestamp);
 
@@ -427,47 +434,4 @@ int proxy(srs_flv_t flv, void* client, int recur)
     } while(recur > 0 && ret == 0);
 
     return ret;
-}
-
-int64_t re_create()
-{
-    // if not very precise, we can directly use this as re.
-    int64_t re = srs_utils_time_ms();
-
-    // use the starttime to get the deviation
-    int64_t deviation = re - tools_main_entrance_startup_time;
-    srs_human_trace("deviation is %d ms, pulse is %d ms", (int)(deviation), (int)(RE_PULSE_MS));
-
-    // so, we adjust time to max(0, deviation)
-    // because the last pulse, we already sleeped
-    int adjust = (int)(deviation);
-    if (adjust > 0) {
-        srs_human_trace("adjust re time for %d ms", adjust);
-        re -= adjust;
-    } else {
-        srs_human_trace("no need to adjust re time");
-    }
-
-    return re;
-}
-void re_update(int64_t re, int32_t starttime, u_int32_t time)
-{
-    // send by pulse algorithm.
-    int64_t now = srs_utils_time_ms();
-    int64_t diff = time - starttime - (now -re);
-    if (diff > RE_PULSE_MS && diff < RE_PULSE_JITTER_MS) {
-        usleep((useconds_t)(diff * 1000));
-    }
-}
-void re_cleanup(int64_t re, int32_t starttime, u_int32_t time)
-{
-    // for the last pulse, always sleep.
-    // for the virtual live encoder long time publishing.
-    int64_t now = srs_utils_time_ms();
-    int64_t diff = time - starttime - (now -re);
-    if (diff > 0) {
-        srs_human_trace("re_cleanup, diff=%d, start=%d, last=%d ms",
-            (int)diff, starttime, time);
-        usleep((useconds_t)(diff * 1000));
-    }
 }

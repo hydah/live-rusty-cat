@@ -1,9 +1,8 @@
 cmake_minimum_required (VERSION 2.8)
-
 project (RustyCat)
 
 include_directories(libs cli)
-
+set(CMAKE_CONFIGURATION_TYPES "Debug" CACHE STRING "" FORCE)
 set(
     LIB_SOURCES
 
@@ -28,5 +27,9 @@ add_library (rtmp ${LIB_SOURCES})
 
 add_executable(output/rtmp-play rtmp-play.cpp )
 target_link_libraries (output/rtmp-play  rtmp)
+
 add_executable(output/rtmp-publish rtmp-publish.cpp)
 target_link_libraries (output/rtmp-publish  rtmp)
+
+add_executable(output/flv-publish flv-publish.cpp)
+target_link_libraries (output/flv-publish  rtmp)
