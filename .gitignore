@@ -6,4 +6,8 @@ logs/*
 *.flv
 cscope*
 tags
-
+*.tgz
+CMakeFiles/
+CMakeCache.txt
+cmake_install.cmake
+*.a
